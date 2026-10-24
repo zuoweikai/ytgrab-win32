@@ -387,7 +387,9 @@ static std::wstring ToolDir() {
 }
 
 static std::wstring FindTool(const wchar_t* name) {
-    std::wstring c = ExeDir() + L"\\" + name;
+    std::wstring c = ExeDir() + L"\\tools\\" + name;   // bundled with the release
+    if (FileExists(c)) return c;
+    c = ExeDir() + L"\\" + name;
     if (FileExists(c)) return c;
     c = LocalBinDir() + L"\\" + name;
     if (FileExists(c)) return c;
