@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-A tiny, fast Windows video downloader built on [yt-dlp](https://github.com/yt-dlp/yt-dlp). Written in C++ with plain Win32 controls and compiled into a single static `YtGrab.exe` of about 350 KB: no .NET, VC++ runtime, or Python to install.
+A tiny, fast Windows video downloader built on [yt-dlp](https://github.com/yt-dlp/yt-dlp). Written in C++ with plain Win32 controls and compiled into a single static `YtGrab.exe` of about 350 KB: no .NET, VC++ runtime, or Python to install. yt-dlp and ffmpeg come bundled in the release.
 
 Prefer a Windows 11 look? See the WinUI 3 edition: [ytgrab-winui](https://github.com/zuoweikai/ytgrab-winui).
 
@@ -19,11 +19,10 @@ Unzip and run `YtGrab.exe` on Windows 10 or 11.
 
 ## Getting started
 
-1. Run `YtGrab.exe`. If yt-dlp isn't found when you add a task, YtGrab offers to download it (or place `yt-dlp.exe` next to it yourself).
-2. For 1080p and above or MP3 conversion you need ffmpeg: Settings → "Download ffmpeg" (about 200 MB), or put `ffmpeg.exe` next to `YtGrab.exe`.
-3. Paste one or more links, choose a format and folder, then press Enter or "Add". `Ctrl+V` in the list adds links directly.
+1. Unzip and run `YtGrab.exe`. yt-dlp and ffmpeg are already in the `tools` folder, so 4K, merging, and MP3 work right away.
+2. Paste one or more links, choose a format and folder, then press Enter or "Add". `Ctrl+V` in the list adds links directly.
 
-yt-dlp is found in this order: path in Settings → app folder → `%LOCALAPPDATA%\YtGrab\bin` → `PATH`.
+yt-dlp is found in this order: path in Settings → `tools` folder → app folder → `%LOCALAPPDATA%\YtGrab\bin` → `PATH`.
 Settings are stored in `%APPDATA%\YtGrab\settings.ini`; put an empty `settings.ini` next to the exe for portable mode.
 
 ## Features
