@@ -38,7 +38,12 @@ jobs:
             export CXX=x86_64-w64-mingw32-g++-posix WINDRES=x86_64-w64-mingw32-windres
           fi
           OUT="$PWD/dist/YtGrab-win-${{ matrix.arch }}/YtGrab.exe" sh src/build.sh
-          cp LICENSE.txt dist/YtGrab-win-${{ matrix.arch }}/ 2>/dev/null || true
+
+      - name: Bundle yt-dlp and ffmpeg
+        run: bash scripts/fetch-tools.sh ${{ matrix.arch }} dist/YtGrab-win-${{ matrix.arch }}/tools
+
+      - name: Zip
+        run: |
           cd dist/YtGrab-win-${{ matrix.arch }} && zip -9 -r "../YtGrab-Win32-${{ matrix.arch }}.zip" .
           ls -la ..
 
