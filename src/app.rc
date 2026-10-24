@@ -1,0 +1,63 @@
+#pragma code_page(65001)
+#include <windows.h>
+#include <commctrl.h>
+#include "resource.h"
+
+IDI_APP ICON "app.ico"
+1 RT_MANIFEST "app.manifest"
+
+IDD_SETTINGS DIALOGEX 0, 0, 300, 250
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "设置"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "下载", -1, 7, 7, 286, 94
+    LTEXT           "同时下载任务数：", -1, 15, 23, 90, 9
+    COMBOBOX        IDC_CONC, 110, 21, 60, 160, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "每个任务的分片线程：", -1, 15, 42, 90, 9
+    COMBOBOX        IDC_FRAG, 110, 40, 60, 160, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "限速：", -1, 15, 61, 90, 9
+    EDITTEXT        IDC_RATE, 110, 59, 120, 13, ES_AUTOHSCROLL
+    AUTOCHECKBOX    "下载字幕（中文 / 英文）", IDC_SUBS, 15, 81, 130, 10
+    AUTOCHECKBOX    "嵌入封面", IDC_THUMB, 160, 81, 100, 10
+
+    GROUPBOX        "网络", -1, 7, 106, 286, 52
+    LTEXT           "代理：", -1, 15, 122, 90, 9
+    EDITTEXT        IDC_PROXY, 110, 120, 175, 13, ES_AUTOHSCROLL
+    LTEXT           "使用浏览器 Cookies：", -1, 15, 141, 90, 9
+    COMBOBOX        IDC_COOKIES, 110, 139, 80, 160, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    GROUPBOX        "组件", -1, 7, 163, 286, 62
+    LTEXT           "yt-dlp 路径：", -1, 15, 179, 90, 9
+    EDITTEXT        IDC_YTPATH, 110, 177, 128, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "浏览…", IDC_YTBROWSE, 242, 176, 44, 15
+    PUSHBUTTON      "更新 yt-dlp", IDC_UPDATE, 15, 199, 70, 15
+    PUSHBUTTON      "下载 ffmpeg", IDC_GETFF, 90, 199, 70, 15
+    LTEXT           "", IDC_COMPINFO, 166, 202, 122, 9
+
+    DEFPUSHBUTTON   "确定", IDOK, 189, 230, 50, 15
+    PUSHBUTTON      "取消", IDCANCEL, 243, 230, 50, 15
+END
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,0
+ PRODUCTVERSION 1,0,0,0
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404b0"
+        BEGIN
+            VALUE "FileDescription", "YtGrab 视频下载器"
+            VALUE "FileVersion", "1.0.0"
+            VALUE "ProductName", "YtGrab"
+            VALUE "ProductVersion", "1.0.0"
+            VALUE "OriginalFilename", "YtGrab.exe"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x804, 1200
+    END
+END
