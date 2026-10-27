@@ -35,6 +35,8 @@ BEGIN
     PUSHBUTTON      "下载 ffmpeg", IDC_GETFF, 90, 199, 70, 15
     LTEXT           "", IDC_COMPINFO, 166, 202, 122, 9
 
+    LTEXT           "界面语言：", -1, 9, 233, 50, 9
+    COMBOBOX        IDC_LANG, 60, 230, 80, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     DEFPUSHBUTTON   "确定", IDOK, 189, 230, 50, 15
     PUSHBUTTON      "取消", IDCANCEL, 243, 230, 50, 15
 END
