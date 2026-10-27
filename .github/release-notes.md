@@ -1,5 +1,11 @@
 ## What's new / 更新内容
 
+- **Playlist prompt.** The "Whole playlist" checkbox is gone. A video link that sits inside a playlist now asks: only this video, or the whole playlist. Playlist and channel links still expand into one task per video.
+  **播放列表弹窗询问。** 去掉「下载整个播放列表」复选框；粘贴的视频链接属于播放列表时，弹窗询问只下载当前视频还是整个列表。
+- **Start all / Stop all** buttons after "Parse & add". Stop pauses running and queued tasks; Start resumes paused, failed and canceled ones.
+  **新增「开始全部」「停止全部」按钮。**
+- **No auto-start on launch.** Restored unfinished tasks show as Paused until you click Start all.
+  **打开软件不再自动开始下载**，恢复的未完成任务显示为「已暂停」。
 - **English interface.** Settings now has "Language: System default / 简体中文 / English". Changing it offers an instant restart; unfinished downloads resume automatically.
   **新增英文界面。** 设置里可选「界面语言：跟随系统 / 简体中文 / English」，切换后可一键重启生效，未完成的下载会自动继续。
 - **Simpler input row.** "Parse & add" now sits right before "Download whole playlist"; "Paste & download" was removed. Only playlist/channel links that are still being read show "Parsing…"; rows already in the list just show "Preparing".
