@@ -1,9 +1,9 @@
 ## What's new / 更新内容
 
-- **Your task list survives a restart.** Tasks are saved automatically; finished ones stay in the list, and unfinished downloads resume when you open YtGrab again.
-  **关闭软件后任务不再丢失。** 任务列表自动保存，已完成的保留在列表中，未完成的下次打开自动继续下载。
-- **Reading a playlist no longer adds a placeholder row.** The status bar shows "Reading lists N" until the videos appear in the list.
-  **读取列表时不再在表格里放占位行**，状态栏显示「读取列表 N」，读完后直接出现视频任务。
+- **Instant feedback when you add a link.** The Add button confirms with "✓ Added", a spinning "Parsing N link(s)…" indicator shows while YouTube is being read, and rows that are still being parsed show a moving bar instead of a frozen 0%. Adding a link that is already in the list just says so instead of creating a duplicate.
+  **添加链接立即有反馈。** 点击后按钮显示「✓ 已添加」，读取期间显示转圈的「正在解析 N 个链接…」，正在解析的任务行显示滚动进度条而不是停在 0%；重复添加同一链接会提示「已在列表中」，不会生成重复任务。
+- Task list survives a restart; unfinished downloads resume automatically.
+  任务列表关闭后保留，未完成的下次打开自动继续。
 - Playlists and channels become one task per video (since the previous version), saved in a subfolder per playlist.
   播放列表和频道展开为每个视频一条任务，按播放列表名存到子文件夹。
 - Includes Deno, yt-dlp 2026.10.26 and latest ffmpeg.
