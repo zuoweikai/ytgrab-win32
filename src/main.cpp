@@ -646,49 +646,156 @@ static bool ListEntries(const std::wstring& exe, const std::wstring& url, int de
     return true;
 }
 
+// Links being read are kept out of the list; the status bar shows how many are pending.
+static std::vector<std::shared_ptr<Task>> g_pending;   // guarded by g_mx
+
 static void Expander(std::shared_ptr<Task> t, std::wstring exe, HWND hwnd) {
     std::vector<Entry> v; std::wstring err;
     bool ok = ListEntries(exe, t->url, 0, t, v, err);
     int added = 0;
     {
         std::lock_guard<std::mutex> lk(g_mx);
-        auto it = std::find(g_tasks.begin(), g_tasks.end(), t);
-        if (t->cancel || it == g_tasks.end()) {               // removed or cancelled meanwhile
-            if (t->st == TS_EXPANDING) t->st = TS_CANCELED;
-            t->dirty = true;
-        } else if (!ok || v.empty()) {
-            t->st = TS_FAILED; t->err = err.empty() ? L"无法读取列表" : err; t->title.clear(); t->dirty = true;
-        } else if (v.size() == 1 && !IsYouTube(t->url)) {
-            t->st = TS_QUEUED; t->title.clear(); t->expand = false; t->dirty = true;   // just one video: download the link as is
+        auto it = std::find(g_pending.begin(), g_pending.end(), t);
+        if (it == g_pending.end() || t->cancel) { PostMessageW(hwnd, WM_APP_EXPANDED, 0, 0); return; }
+        g_pending.erase(it);
+        t->title.clear(); t->expand = false; t->st = TS_QUEUED; t->dirty = true;
+        if (!ok || v.empty() || (v.size() == 1 && !IsYouTube(t->url))) {
+            // Could not list it (or it is a single video): download the link as is, yt-dlp reports any error.
+            g_tasks.push_back(t);
+            added = 1;
         } else {
-            // Count videos per list so each row shows [i/n] within its own playlist.
-            std::vector<std::shared_ptr<Task>> kids;
             std::vector<std::wstring> lists;
             for (auto& e : v) if (std::find(lists.begin(), lists.end(), e.list) == lists.end()) lists.push_back(e.list);
-            bool sub = v.size() > 1;
             for (auto& l : lists) {
                 int n = 0; for (auto& e : v) if (e.list == l) ++n;
                 int i = 0;
                 std::wstring dir = t->outDir;
                 std::wstring f = SafeFolder(l);
-                if (sub && !f.empty()) dir += L"\\" + f;
+                if (v.size() > 1 && !f.empty()) dir += L"\\" + f;
                 for (auto& e : v) {
                     if (e.list != l) continue;
                     auto k = std::make_shared<Task>();
                     k->id = g_nextId++;
                     k->url = e.url; k->title = e.title; k->outDir = dir; k->fmt = t->fmt;
                     k->playlist = false; k->plIdx = ++i; k->plCount = n;
-                    kids.push_back(k);
+                    g_tasks.push_back(k);
+                    ++added;
                 }
             }
-            g_tasks.insert(g_tasks.erase(it), kids.begin(), kids.end());
-            added = (int)kids.size();
         }
     }
     PostMessageW(hwnd, WM_APP_EXPANDED, 0, added);
 }
 
 static void StartExpand(const std::shared_ptr<Task>& t) {   // caller holds g_mx
+    t->st = TS_EXPANDING; t->cancel = false; t->err.clear();
+    g_pending.push_back(t);
+    std::thread(Expander, t, g_ytdlp, g_hwnd).detach();
+}
+
+// ---------------------------------------------------------------------------
+// Task list persistence (tasks.txt next to settings.ini): survives restarts
+// ---------------------------------------------------------------------------
+static std::string ToUtf8(const std::wstring& w) {
+    if (w.empty()) return {};
+    int n = WideCharToMultiByte(CP_UTF8, 0, w.data(), (int)w.size(), nullptr, 0, nullptr, nullptr);
+    std::string s(n, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, w.data(), (int)w.size(), &s[0], n, nullptr, nullptr);
+    return s;
+}
+static std::wstring Esc(const std::wstring& v) {
+    std::wstring r;
+    for (wchar_t c : v) {
+        if (c == L'\\') r += L"\\\\"; else if (c == L'\t') r += L"\\t";
+        else if (c == L'\n') r += L"\\n"; else if (c == L'\r') r += L"\\r"; else r += c;
+    }
+    return r;
+}
+static std::wstring Unesc(const std::wstring& v) {
+    std::wstring r;
+    for (size_t i = 0; i < v.size(); ++i) {
+        if (v[i] != L'\\' || i + 1 >= v.size()) { r += v[i]; continue; }
+        wchar_t e = v[++i];
+        r += e == L't' ? L'\t' : e == L'n' ? L'\n' : e == L'r' ? L'\r' : e;
+    }
+    return r;
+}
+static std::wstring TasksFile() { return DirOf(g_ini) + L"\\tasks.txt"; }
+static bool g_saveDue = false;
+static DWORD g_lastSave = 0;
+
+static void SaveTasks() {
+    std::wstring out = L"YtGrabTasks 1\n";
+    {
+        std::lock_guard<std::mutex> lk(g_mx);
+        auto line = [&](wchar_t kind, const Task& t) {
+            out += kind;
+            for (auto& f : { t.url, t.outDir, std::to_wstring(t.fmt), std::to_wstring((int)t.playlist), t.title,
+                             t.filepath, t.err, std::to_wstring((long long)t.total), std::to_wstring(t.plIdx),
+                             std::to_wstring(t.plCount) })
+                out += L"\t" + Esc(f);
+            out += L"\n";
+        };
+        for (auto& t : g_tasks) {
+            // D done, F failed, C canceled, Q anything unfinished (resumes on next start)
+            wchar_t k = t->st == TS_DONE ? L'D' : t->st == TS_FAILED ? L'F' : t->st == TS_CANCELED ? L'C' : L'Q';
+            line(k, *t);
+        }
+        for (auto& t : g_pending) line(L'L', *t);          // links still being read
+    }
+    std::wstring tmp = TasksFile() + L".tmp";
+    HANDLE h = CreateFileW(tmp.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return;
+    std::string u = ToUtf8(out);
+    DWORD w = 0;
+    BOOL ok = WriteFile(h, u.data(), (DWORD)u.size(), &w, nullptr);
+    CloseHandle(h);
+    if (ok && w == u.size()) MoveFileExW(tmp.c_str(), TasksFile().c_str(), MOVEFILE_REPLACE_EXISTING);
+    else DeleteFileW(tmp.c_str());
+    g_saveDue = false; g_lastSave = GetTickCount();
+}
+
+static void LoadTasks() {
+    HANDLE h = CreateFileW(TasksFile().c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return;
+    std::string raw; char buf[65536]; DWORD n = 0;
+    while (ReadFile(h, buf, sizeof(buf), &n, nullptr) && n) raw.append(buf, n);
+    CloseHandle(h);
+    std::wstring text = FromUtf8(raw);
+    std::lock_guard<std::mutex> lk(g_mx);
+    size_t s = 0;
+    while (s < text.size()) {
+        size_t e = text.find(L'\n', s);
+        if (e == std::wstring::npos) e = text.size();
+        std::wstring ln = text.substr(s, e - s);
+        s = e + 1;
+        if (ln.empty() || !wcschr(L"DFCQL", ln[0]) || ln.size() < 2 || ln[1] != L'\t') continue;
+        std::vector<std::wstring> f;
+        size_t a = 2, b;
+        while ((b = ln.find(L'\t', a)) != std::wstring::npos) { f.push_back(Unesc(ln.substr(a, b - a))); a = b + 1; }
+        f.push_back(Unesc(ln.substr(a)));
+        if (f.size() < 10 || f[0].empty()) continue;
+        auto t = std::make_shared<Task>();
+        t->id = g_nextId++;
+        t->url = f[0]; t->outDir = f[1]; t->fmt = _wtoi(f[2].c_str()); t->playlist = f[3] == L"1";
+        t->title = f[4]; t->filepath = f[5]; t->err = f[6]; t->total = _wtof(f[7].c_str());
+        if (t->total <= 0) t->total = -1;
+        t->plIdx = _wtoi(f[8].c_str()); t->plCount = _wtoi(f[9].c_str());
+        switch (ln[0]) {
+        case L'D': t->st = TS_DONE; t->pct = 100; break;
+        case L'F': t->st = TS_FAILED; break;
+        case L'C': t->st = TS_CANCELED; break;
+        case L'L':
+            t->expand = true;
+            if (!g_ytdlp.empty()) { t->title.clear(); StartExpand(t); continue; }
+            t->st = TS_QUEUED; break;
+        default: t->st = TS_QUEUED; break;
+        }
+        g_tasks.push_back(t);
+    }
+}
+
+// caller holds g_mx
     t->st = TS_EXPANDING; t->cancel = false; t->err.clear(); t->dirty = true;
     t->title = L"正在读取列表… " + t->url;
     std::thread(Expander, t, g_ytdlp, g_hwnd).detach();
@@ -923,7 +1030,9 @@ static void ReadUiSettings() {
 
 static int TaskCount() { std::lock_guard<std::mutex> lk(g_mx); return (int)g_tasks.size(); }
 
+static bool g_saveDue2 = false;
 static void RefreshListCount() {
+    g_saveDue2 = true;
     ListView_SetItemCountEx(g_hList, TaskCount(), LVSICF_NOSCROLL);
     InvalidateRect(g_hList, nullptr, FALSE);
 }
@@ -952,15 +1061,15 @@ static void AddFromText(const std::wstring& text) {
             auto t = std::make_shared<Task>();
             t->id = g_nextId++;
             t->url = u; t->outDir = g_set.outDir; t->fmt = g_set.fmt; t->playlist = g_set.playlist;
-            t->expand = g_set.playlist && LooksLikeList(u);
-            g_tasks.push_back(t);
-            if (t->expand && !g_ytdlp.empty()) StartExpand(t);
+            t->expand = g_set.playlist && LooksLikeList(u) && !g_ytdlp.empty();
+            if (t->expand) StartExpand(t);          // kept out of the list until its videos are known
+            else g_tasks.push_back(t);
         }
         last = (int)g_tasks.size() - 1;
     }
     RefreshListCount();
-    ListView_EnsureVisible(g_hList, last, FALSE);
-    g_statusMsg = L"已添加 " + std::to_wstring(urls.size()) + L" 个任务";
+    if (last >= 0) ListView_EnsureVisible(g_hList, last, FALSE);
+    g_statusMsg = L"已添加 " + std::to_wstring(urls.size()) + L" 个链接";
     SetStatusPart(0, g_statusMsg);
     if (g_ytdlp.empty()) PromptYtdlp(); else Pump();
 }
@@ -1183,13 +1292,14 @@ static void ShowSelectionInfo() {
 
 static void OnTimer() {
     std::vector<int> dirty;
-    int active = 0, queued = 0;
+    int active = 0, queued = 0, reading = 0;
     double speed = 0, pctSum = 0;
     {
         std::lock_guard<std::mutex> lk(g_mx);
+        reading = (int)g_pending.size();
         for (int i = 0; i < (int)g_tasks.size(); ++i) {
             Task& t = *g_tasks[i];
-            if (t.dirty) { dirty.push_back(i); t.dirty = false; }
+            if (t.dirty) { dirty.push_back(i); t.dirty = false; g_saveDue = true; }
             if (IsActive(t.st)) { ++active; pctSum += t.pct; if (t.speed > 0 && t.st == TS_DOWNLOADING) speed += t.speed; }
             else if (t.st == TS_QUEUED) ++queued;
         }
@@ -1200,6 +1310,9 @@ static void OnTimer() {
     }
     static std::wstring lastCnt, lastSpd;
     std::wstring cnt = L"下载中 " + std::to_wstring(active) + L" · 等待 " + std::to_wstring(queued);
+    if (reading) cnt = L"读取列表 " + std::to_wstring(reading) + L" · " + cnt;
+    if (g_saveDue2) { g_saveDue = true; g_saveDue2 = false; }
+    if (g_saveDue && GetTickCount() - g_lastSave > 3000) SaveTasks();
     std::wstring spd = active ? FmtBytes(speed) + L"/s" : L"";
     if (cnt != lastCnt) { SetStatusPart(3, cnt); lastCnt = cnt; }
     if (spd != lastSpd) { SetStatusPart(4, spd); lastSpd = spd; }
@@ -1382,6 +1495,10 @@ static void OnCreate(HWND hwnd) {
     DetectTools();
     UpdateToolStatus();
     SetStatusPart(0, L"就绪");
+    LoadTasks();
+    RefreshListCount();
+    { int n = TaskCount(); if (n) { g_statusMsg = L"已恢复 " + std::to_wstring(n) + L" 个任务"; SetStatusPart(0, g_statusMsg); } }
+    Pump();
     SetTimer(hwnd, 1, 250, nullptr);
     SetFocus(g_hUrl);
 }
@@ -1458,7 +1575,6 @@ static void OnCommand(HWND hwnd, int id, int code) {
                 t->st = TS_QUEUED; t->pct = 0; t->total = -1; t->speed = -1; t->eta = -1;
                 t->err.clear(); t->filepath.clear(); t->cancel = false; t->dirty = true;
                 if (t->playlist) t->plIdx = t->plCount = 0;
-                if (t->expand && !g_ytdlp.empty()) StartExpand(t);
             }
         }
         if (g_ytdlp.empty()) PromptYtdlp(); else Pump();
@@ -1533,7 +1649,7 @@ static bool ConfirmClose() {
         for (auto& t : g_tasks) if (IsActive(t->st)) ++active;
     }
     if (!active) return true;
-    std::wstring m = L"还有 " + std::to_wstring(active) + L" 个任务正在下载，退出将中断它们。确定退出吗？";
+    std::wstring m = L"还有 " + std::to_wstring(active) + L" 个任务正在下载，退出将暂停它们，下次打开会自动继续。确定退出吗？";
     return MessageBoxW(g_hwnd, m.c_str(), kAppName, MB_OKCANCEL | MB_ICONWARNING | MB_DEFBUTTON2) == IDOK;
 }
 
@@ -1587,7 +1703,8 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         return 0;
     case WM_APP_EXPANDED:
         RefreshListCount();
-        if (lp > 0) { g_statusMsg = L"列表已展开为 " + std::to_wstring((int)lp) + L" 个下载任务"; SetStatusPart(0, g_statusMsg); }
+        if (lp > 1) { g_statusMsg = L"列表已展开为 " + std::to_wstring((int)lp) + L" 个下载任务"; SetStatusPart(0, g_statusMsg); }
+        if (lp > 0) { int n = TaskCount(); ListView_EnsureVisible(g_hList, n - 1, FALSE); }
         Pump();
         OnTimer();
         ShowSelectionInfo();
@@ -1621,9 +1738,11 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_CLOSE:
         if (!ConfirmClose()) return 0;
         CommitUiAndSave();
+        SaveTasks();                       // unfinished downloads continue next time
         {
             std::lock_guard<std::mutex> lk(g_mx);
             for (auto& t : g_tasks) { t->cancel = true; if (t->job) TerminateJobObject(t->job, 1); }
+            for (auto& t : g_pending) t->cancel = true;
         }
         DestroyWindow(hwnd);
         return 0;
