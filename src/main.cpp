@@ -44,7 +44,7 @@
 // ---------------------------------------------------------------------------
 enum {
     IDC_URLLBL = 200, IDC_URL, IDC_PASTE, IDC_FMTLBL, IDC_FMT, IDC_DIRLBL, IDC_DIR,
-    IDC_BROWSE, IDC_PLAYLIST, IDC_SETTINGS, IDC_OPENDIR, IDC_LIST, IDC_STATUS, IDC_BUSY, IDC_BUSYTXT,
+    IDC_BROWSE, IDC_STARTALL, IDC_STOPALL, IDC_SETTINGS, IDC_OPENDIR, IDC_LIST, IDC_STATUS, IDC_BUSY, IDC_BUSYTXT,
     ID_OPENFILE = 300, ID_OPENFOLDER, ID_COPYURL, ID_RETRY, ID_CANCELTASK, ID_REMOVE,
     ID_CLEARDONE, ID_SELALL, ID_UPDATE_YTDLP, ID_GET_FFMPEG, ID_GET_YTDLP
 };
@@ -65,6 +65,18 @@ static const wchar_t* kAppName  = L"YtGrab 视频下载器";
 static bool g_en = false;
 struct TrPair { const wchar_t* zh; const wchar_t* en; };
 static const TrPair EN_TABLE[] = {
+    { L"开始全部", L"Start all" },
+    { L"，未完成的点「开始全部」继续", L"; click \"Start all\" to resume unfinished ones" },
+    { L"停止全部", L"Stop all" },
+    { L"已暂停", L"Paused" },
+    { L"只下载当前视频", L"Only this video" },
+    { L"这个链接属于一个播放列表", L"This link is part of a playlist" },
+    { L"要只下载当前这个视频，还是下载整个播放列表？", L"Download only this video, or the whole playlist?" },
+    { L"这个链接属于一个播放列表。\n\n是：只下载当前视频\n否：下载整个播放列表", L"This link is part of a playlist.\n\nYes: only this video\nNo: the whole playlist" },
+    { L"已开始 ", L"Started " },
+    { L"没有可开始的任务", L"Nothing to start" },
+    { L"已暂停 ", L"Paused " },
+    { L"没有正在下载的任务", L"Nothing is downloading" },
     { L"YtGrab 视频下载器", L"YtGrab Video Downloader" },
     { L"最佳画质（视频 + 音频）", L"Best quality (video + audio)" },
     { L"MP4 兼容（H.264，≤1080p）", L"MP4 compatible (H.264, ≤1080p)" },
@@ -155,7 +167,7 @@ static const TrPair EN_TABLE[] = {
     { L" 个任务", L" task(s)" },
     { L"还没有下载任务。粘贴视频链接后点击「解析并添加下载」，或在列表中按 Ctrl+V。", L"No downloads yet. Paste video links and click \"Parse & add\", or press Ctrl+V in the list." },
     { L"还有 ", L"" },
-    { L" 个任务正在下载，退出将暂停它们，下次打开会自动继续。确定退出吗？", L" download(s) still running. Quitting pauses them and they resume next time. Quit now?" },
+    { L" 个任务正在下载，退出将暂停它们，下次打开后点「开始全部」继续。确定退出吗？", L" download(s) still running. Quitting pauses them; click \"Start all\" next time to resume. Quit now?" },
     { L"列表已展开为 ", L"List expanded into " },
     { L" 个下载任务", L" downloads" },
     { L"完成", L"Done" },
@@ -366,7 +378,7 @@ static const int kFormatCount = sizeof(g_formats) / sizeof(g_formats[0]);
 // ---------------------------------------------------------------------------
 // Tasks
 // ---------------------------------------------------------------------------
-enum TaskState { TS_EXPANDING, TS_QUEUED, TS_STARTING, TS_DOWNLOADING, TS_PROCESSING, TS_DONE, TS_FAILED, TS_CANCELED };
+enum TaskState { TS_EXPANDING, TS_PAUSED, TS_QUEUED, TS_STARTING, TS_DOWNLOADING, TS_PROCESSING, TS_DONE, TS_FAILED, TS_CANCELED };
 
 struct Task {
     int id = 0;
@@ -378,6 +390,7 @@ struct Task {
     TaskState st = TS_QUEUED;
     double pct = 0, total = -1, speed = -1, eta = -1;
     int plIdx = 0, plCount = 0;
+    bool pause = false;       // stopped by "停止全部": ends as paused, not canceled
     bool expand = false;      // playlist/channel link: list its videos as separate tasks first
     HANDLE job = nullptr;
     bool cancel = false;
@@ -395,7 +408,7 @@ static bool IsActive(TaskState s) { return s == TS_STARTING || s == TS_DOWNLOADI
 // ---------------------------------------------------------------------------
 static HINSTANCE g_hInst;
 static HWND g_hwnd, g_hUrlLbl, g_hUrl, g_hAdd, g_hFmtLbl, g_hFmt, g_hDirLbl, g_hDir, g_hBrowse,
-            g_hPlaylist, g_hSettings, g_hOpenDir, g_hList, g_hStatus, g_hBusy, g_hBusyTxt;
+            g_hStartAll, g_hStopAll, g_hSettings, g_hOpenDir, g_hList, g_hStatus, g_hBusy, g_hBusyTxt;
 static HWND g_hSettingsDlg;
 static HFONT g_font;
 static UINT g_dpi = 96;
@@ -629,7 +642,7 @@ static void Worker(std::shared_ptr<Task> t, std::wstring exe, std::wstring args,
     {
         std::lock_guard<std::mutex> lk(g_mx);
         t->job = nullptr;
-        if (t->cancel) t->st = TS_CANCELED;
+        if (t->cancel) { t->st = t->pause ? TS_PAUSED : TS_CANCELED; t->pause = false; }
         else if (code == 0) { t->st = TS_DONE; t->pct = 100; }
         else {
             t->st = TS_FAILED;
@@ -913,11 +926,9 @@ static void LoadTasks() {
         case L'D': t->st = TS_DONE; t->pct = 100; break;
         case L'F': t->st = TS_FAILED; break;
         case L'C': t->st = TS_CANCELED; break;
-        case L'L':
-            t->expand = true;
-            if (!g_ytdlp.empty()) { t->title.clear(); StartExpand(t); continue; }
-            t->st = TS_QUEUED; break;
-        default: t->st = TS_QUEUED; break;
+        case L'L':                       // a list that was still being read: download it whole
+            t->playlist = true; t->st = TS_PAUSED; break;
+        default: t->st = TS_PAUSED; break;   // never auto-start on launch; "开始全部" resumes
         }
         g_tasks.push_back(t);
     }
@@ -1113,9 +1124,11 @@ static void Layout() {
     int aw = S(150);
     mv(g_hAdd, m, y, aw, bh);
     int px = m + aw + S(14);
-    mv(g_hPlaylist, px, y + (bh - lh) / 2, S(170), lh);
+    int sw = S(100);
+    mv(g_hStartAll, px, y, sw, bh);
+    mv(g_hStopAll, px + sw + g, y, sw, bh);
     {
-        int bx = px + S(180), bwid = S(90), bhh = S(8);
+        int bx = px + 2 * sw + g + S(14), bwid = S(90), bhh = S(8);
         int tx = bx + bwid + S(10);
         mv(g_hBusy, bx, y + (bh - bhh) / 2, bwid, bhh);
         mv(g_hBusyTxt, tx, y + (bh - lh) / 2, std::max(S(10), W - m - 2 * bw - 2 * g - tx), lh);
@@ -1154,7 +1167,6 @@ static void ReadUiSettings() {
     if (!d.empty()) g_set.outDir = d;
     int f = (int)SendMessageW(g_hFmt, CB_GETCURSEL, 0, 0);
     if (f >= 0) g_set.fmt = f;
-    g_set.playlist = Button_GetCheck(g_hPlaylist) == BST_CHECKED;
 }
 
 static int TaskCount() { std::lock_guard<std::mutex> lk(g_mx); return (int)g_tasks.size(); }
@@ -1173,6 +1185,70 @@ static void PromptYtdlp() {
     if (r == IDYES) StartComponent(ID_GET_YTDLP);
 }
 
+// A single video link that also carries a playlist (YouTube watch?v=…&list=…, youtu.be/…?list=…).
+static bool IsVideoInList(const std::wstring& u) {
+    std::wstring l = Lower(u);
+    return IsYouTubeVideo(u) && l.find(L"list=") != std::wstring::npos;
+}
+
+enum { ID_PL_ONE = 101, ID_PL_ALL = 102 };
+static int AskPlaylist() {
+    TASKDIALOG_BUTTON btns[] = {
+        { ID_PL_ONE, T(L"只下载当前视频") },
+        { ID_PL_ALL, T(L"下载整个播放列表") },
+    };
+    TASKDIALOGCONFIG c{ sizeof(c) };
+    c.hwndParent = g_hwnd;
+    c.dwFlags = TDF_USE_COMMAND_LINKS | TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW;
+    c.dwCommonButtons = TDCBF_CANCEL_BUTTON;
+    c.pszWindowTitle = T(kAppName);
+    c.pszMainIcon = TD_INFORMATION_ICON;
+    c.pszMainInstruction = T(L"这个链接属于一个播放列表");
+    c.pszContent = T(L"要只下载当前这个视频，还是下载整个播放列表？");
+    c.cButtons = 2; c.pButtons = btns; c.nDefaultButton = ID_PL_ONE;
+    int r = IDCANCEL;
+    if (FAILED(TaskDialogIndirect(&c, &r, nullptr, nullptr))) {
+        int m = MessageBoxW(g_hwnd, T(L"这个链接属于一个播放列表。\n\n是：只下载当前视频\n否：下载整个播放列表"),
+                            T(kAppName), MB_YESNOCANCEL | MB_ICONQUESTION);
+        r = m == IDYES ? ID_PL_ONE : m == IDNO ? ID_PL_ALL : IDCANCEL;
+    }
+    return r;
+}
+
+static void PumpOrPrompt() { if (g_ytdlp.empty()) PromptYtdlp(); else Pump(); }
+static void StartAll() {
+    int n = 0;
+    {
+        std::lock_guard<std::mutex> lk(g_mx);
+        for (auto& t : g_tasks) {
+            if (t->st != TS_PAUSED && t->st != TS_FAILED && t->st != TS_CANCELED) continue;
+            t->st = TS_QUEUED; t->speed = -1; t->eta = -1;
+            t->err.clear(); t->cancel = false; t->pause = false; t->dirty = true; ++n;
+        }
+    }
+    g_statusMsg = n ? T(L"已开始 ") + std::to_wstring(n) + T(L" 个任务") : std::wstring(T(L"没有可开始的任务"));
+    SetStatusPart(0, g_statusMsg);
+    if (n) PumpOrPrompt();
+}
+static void StopAll() {
+    int n = 0;
+    {
+        std::lock_guard<std::mutex> lk(g_mx);
+        for (auto& t : g_tasks) {
+            if (t->st == TS_QUEUED) { t->st = TS_PAUSED; t->dirty = true; ++n; }
+            else if (IsActive(t->st)) {
+                t->cancel = true; t->pause = true; ++n;
+                if (t->job) TerminateJobObject(t->job, 1);
+                t->dirty = true;
+            }
+        }
+    }
+    g_saveDue = true;
+    g_statusMsg = n ? T(L"已暂停 ") + std::to_wstring(n) + T(L" 个任务") : std::wstring(T(L"没有正在下载的任务"));
+    SetStatusPart(0, g_statusMsg);
+    InvalidateRect(g_hList, nullptr, FALSE);
+}
+
 static void AddFromText(const std::wstring& text) {
     auto urls = ExtractUrls(text);
     if (urls.empty()) {
@@ -1182,6 +1258,15 @@ static void AddFromText(const std::wstring& text) {
         return;
     }
     ReadUiSettings();
+    // A video that sits inside a playlist (watch?v=…&list=…): ask once per batch.
+    bool anyMixed = false;
+    for (auto& u : urls) if (IsVideoInList(u)) anyMixed = true;
+    bool wholeList = false;
+    if (anyMixed) {
+        int r = AskPlaylist();
+        if (r == IDCANCEL) return;
+        wholeList = r == ID_PL_ALL;
+    }
     int last, added = 0, dup = 0;
     {
         std::lock_guard<std::mutex> lk(g_mx);
@@ -1194,8 +1279,9 @@ static void AddFromText(const std::wstring& text) {
             ++added;
             auto t = std::make_shared<Task>();
             t->id = g_nextId++;
-            t->url = u; t->outDir = g_set.outDir; t->fmt = g_set.fmt; t->playlist = g_set.playlist;
-            t->expand = g_set.playlist && LooksLikeList(u) && !g_ytdlp.empty();
+            bool list = IsVideoInList(u) ? wholeList : LooksLikeList(u);
+            t->url = u; t->outDir = g_set.outDir; t->fmt = g_set.fmt; t->playlist = list;
+            t->expand = list && !g_ytdlp.empty();
             if (t->expand) StartExpand(t);          // kept out of the list until its videos are known
             else g_tasks.push_back(t);
         }
@@ -1251,7 +1337,7 @@ static std::vector<std::shared_ptr<Task>> SelectedTasks() {
 
 static void CancelTask(const std::shared_ptr<Task>& t) {
     std::lock_guard<std::mutex> lk(g_mx);
-    if (t->st == TS_QUEUED) { t->st = TS_CANCELED; t->dirty = true; return; }
+    if (t->st == TS_QUEUED || t->st == TS_PAUSED) { t->st = TS_CANCELED; t->dirty = true; return; }
     if (t->st == TS_EXPANDING) { t->cancel = true; t->st = TS_CANCELED; t->title.clear(); t->dirty = true; return; }
     if (IsActive(t->st)) {
         t->cancel = true;
@@ -1320,6 +1406,7 @@ static void BrowseFolder(HWND owner, HWND edit) {
 static const wchar_t* StateText(TaskState s) {
     switch (s) {
     case TS_EXPANDING: return T(L"读取列表…");
+    case TS_PAUSED: return T(L"已暂停");
     case TS_QUEUED: return T(L"等待中");
     case TS_STARTING: return T(L"准备中…");
     case TS_DOWNLOADING: return T(L"下载中");
@@ -1375,7 +1462,7 @@ static void DrawProgressCell(HDC hdc, int item) {
     if (bar.right - bar.left < S(16)) { bar.right = cell.right - S(6); textW = 0; }
 
     if (st == TS_DONE) pct = 100;
-    int state = (st == TS_FAILED) ? PBFS_ERROR : (st == TS_CANCELED) ? PBFS_PAUSED : PBFS_NORMAL;
+    int state = (st == TS_FAILED) ? PBFS_ERROR : (st == TS_CANCELED || st == TS_PAUSED) ? PBFS_PAUSED : PBFS_NORMAL;
     if (g_progTheme) {
         DrawThemeBackground(g_progTheme, hdc, PP_BAR, 0, &bar, nullptr);
         RECT in; GetThemeBackgroundContentRect(g_progTheme, hdc, PP_BAR, 0, &bar, &in);
@@ -1494,8 +1581,8 @@ static void ShowContextMenu(int x, int y) {
     {
         std::lock_guard<std::mutex> lk(g_mx);
         for (auto& t : sel) {
-            if (IsActive(t->st) || t->st == TS_QUEUED || t->st == TS_EXPANDING) canCancel = true;
-            if (t->st == TS_FAILED || t->st == TS_CANCELED || t->st == TS_DONE) canRetry = true;
+            if (IsActive(t->st) || t->st == TS_QUEUED || t->st == TS_EXPANDING || t->st == TS_PAUSED) canCancel = true;
+            if (t->st == TS_FAILED || t->st == TS_CANCELED || t->st == TS_DONE || t->st == TS_PAUSED) canRetry = true;
             if (!t->filepath.empty()) hasFile = true;
         }
     }
@@ -1680,7 +1767,8 @@ static void OnCreate(HWND hwnd) {
     g_hDirLbl  = MakeCtl(WC_STATICW, T(L"保存到"), SS_LEFT, IDC_DIRLBL);
     g_hDir     = MakeCtl(WC_EDITW, g_set.outDir.c_str(), WS_TABSTOP | ES_AUTOHSCROLL, IDC_DIR, WS_EX_CLIENTEDGE);
     g_hBrowse  = MakeCtl(WC_BUTTONW, T(L"浏览…"), WS_TABSTOP | BS_PUSHBUTTON, IDC_BROWSE);
-    g_hPlaylist= MakeCtl(WC_BUTTONW, T(L"下载整个播放列表"), WS_TABSTOP | BS_AUTOCHECKBOX, IDC_PLAYLIST);
+    g_hStartAll= MakeCtl(WC_BUTTONW, T(L"开始全部"), WS_TABSTOP | BS_PUSHBUTTON, IDC_STARTALL);
+    g_hStopAll = MakeCtl(WC_BUTTONW, T(L"停止全部"), WS_TABSTOP | BS_PUSHBUTTON, IDC_STOPALL);
     g_hOpenDir = MakeCtl(WC_BUTTONW, T(L"打开文件夹"), WS_TABSTOP | BS_PUSHBUTTON, IDC_OPENDIR);
     g_hSettings= MakeCtl(WC_BUTTONW, T(L"设置…"), WS_TABSTOP | BS_PUSHBUTTON, IDC_SETTINGS);
     g_hList    = MakeCtl(WC_LISTVIEWW, L"", WS_TABSTOP | LVS_REPORT | LVS_OWNERDATA | LVS_SHOWSELALWAYS, IDC_LIST, WS_EX_CLIENTEDGE);
@@ -1694,7 +1782,6 @@ static void OnCreate(HWND hwnd) {
     SetWindowSubclass(g_hDir, EditMenuProc, 1, 0);
     for (int i = 0; i < kFormatCount; ++i) SendMessageW(g_hFmt, CB_ADDSTRING, 0, (LPARAM)T(g_formats[i].name));
     SendMessageW(g_hFmt, CB_SETCURSEL, (g_set.fmt >= 0 && g_set.fmt < kFormatCount) ? g_set.fmt : 0, 0);
-    Button_SetCheck(g_hPlaylist, g_set.playlist ? BST_CHECKED : BST_UNCHECKED);
     SendMessageW(g_hDir, EM_SETCUEBANNER, TRUE, (LPARAM)T(L"选择保存目录"));
 
     SetWindowTheme(g_hList, L"Explorer", nullptr);
@@ -1715,7 +1802,7 @@ static void OnCreate(HWND hwnd) {
     SetStatusPart(0, T(L"就绪"));
     LoadTasks();
     RefreshListCount();
-    { int n = TaskCount(); if (n) { g_statusMsg = T(L"已恢复 ") + std::to_wstring(n) + T(L" 个任务"); SetStatusPart(0, g_statusMsg); } }
+    { int n = TaskCount(); if (n) { g_statusMsg = T(L"已恢复 ") + std::to_wstring(n) + T(L" 个任务") + T(L"，未完成的点「开始全部」继续"); SetStatusPart(0, g_statusMsg); } }
     Pump();
     SetTimer(hwnd, 1, 250, nullptr);
     SetFocus(g_hUrl);
@@ -1772,8 +1859,8 @@ static void OnCommand(HWND hwnd, int id, int code) {
         if (DialogBoxParamW(g_hInst, MAKEINTRESOURCEW(IDD_SETTINGS), hwnd, SettingsProc, 0) == IDOK) {
             DetectTools(); UpdateToolStatus(); Pump();
             if (g_langChanged &&
-                MessageBoxW(hwnd, L"界面语言将在重启后生效，现在重启 YtGrab 吗？（未完成的下载会自动继续）\n\n"
-                                  L"The new language applies after a restart. Restart YtGrab now? (Unfinished downloads resume.)",
+                MessageBoxW(hwnd, L"界面语言将在重启后生效，现在重启 YtGrab 吗？（未完成的下载会保留）\n\n"
+                                  L"The new language applies after a restart. Restart YtGrab now? (Unfinished downloads are kept.)",
                             L"YtGrab", MB_YESNO | MB_ICONQUESTION) == IDYES) {
                 g_restart = true;
                 PostMessageW(hwnd, WM_CLOSE, 0, 0);
@@ -1781,9 +1868,10 @@ static void OnCommand(HWND hwnd, int id, int code) {
         }
         break;
     case IDC_FMT:
-    case IDC_PLAYLIST:
-        if (code == CBN_SELCHANGE || code == BN_CLICKED) ReadUiSettings();
+        if (code == CBN_SELCHANGE) ReadUiSettings();
         break;
+    case IDC_STARTALL: StartAll(); break;
+    case IDC_STOPALL:  StopAll(); break;
     case ID_OPENFILE:   { auto s = SelectedTasks(); if (!s.empty()) OpenTaskFile(s[0]); break; }
     case ID_OPENFOLDER: { auto s = SelectedTasks(); if (!s.empty()) OpenTaskFolder(s[0]); break; }
     case ID_COPYURL: {
@@ -1875,7 +1963,7 @@ static bool ConfirmClose() {
         for (auto& t : g_tasks) if (IsActive(t->st)) ++active;
     }
     if (!active) return true;
-    std::wstring m = std::wstring(T(L"还有 ")) + std::to_wstring(active) + T(L" 个任务正在下载，退出将暂停它们，下次打开会自动继续。确定退出吗？");
+    std::wstring m = std::wstring(T(L"还有 ")) + std::to_wstring(active) + T(L" 个任务正在下载，退出将暂停它们，下次打开后点「开始全部」继续。确定退出吗？");
     return MessageBoxW(g_hwnd, m.c_str(), T(kAppName), MB_OKCANCEL | MB_ICONWARNING | MB_DEFBUTTON2) == IDOK;
 }
 
