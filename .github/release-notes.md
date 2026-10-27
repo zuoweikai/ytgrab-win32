@@ -1,7 +1,9 @@
 ## What's new / 更新内容
 
-- **Updated yt-dlp to 2026.10.26**, which includes security fixes. ffmpeg refreshed to the latest build.
-  **yt-dlp 升级到 2026.10.26**，包含安全修复；ffmpeg 同步更新到最新构建。
+- **Deno is now included.** YouTube now requires a JavaScript runtime for downloads; YtGrab ships `deno.exe` next to `yt-dlp.exe`, so YouTube works on a clean PC with nothing to install.
+  **内置 Deno。** YouTube 下载现在需要 JavaScript 运行时，YtGrab 已在 `yt-dlp.exe` 旁边附带 `deno.exe`，干净电脑上也能直接下载，无需另装。
+- yt-dlp 2026.10.26 (security fixes) and latest ffmpeg.
+  yt-dlp 2026.10.26（含安全修复）与最新 ffmpeg。
 
 ## Download / 下载
 
