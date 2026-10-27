@@ -266,7 +266,7 @@ static bool IsActive(TaskState s) { return s == TS_STARTING || s == TS_DOWNLOADI
 // Globals: UI
 // ---------------------------------------------------------------------------
 static HINSTANCE g_hInst;
-static HWND g_hwnd, g_hUrlLbl, g_hUrl, g_hAdd, g_hPaste, g_hFmtLbl, g_hFmt, g_hDirLbl, g_hDir, g_hBrowse,
+static HWND g_hwnd, g_hUrlLbl, g_hUrl, g_hAdd, g_hFmtLbl, g_hFmt, g_hDirLbl, g_hDir, g_hBrowse,
             g_hPlaylist, g_hSettings, g_hOpenDir, g_hList, g_hStatus, g_hBusy, g_hBusyTxt;
 static HWND g_hSettingsDlg;
 static HFONT g_font;
@@ -966,9 +966,7 @@ static void Layout() {
     mv(g_hUrlLbl, m, y, W - 2 * m, lh);
     y += lh + S(4);
     int eh = bh * 2 + g;
-    mv(g_hUrl, m, y, W - 2 * m - bw - g, eh);
-    mv(g_hAdd, W - m - bw, y, bw, bh);
-    mv(g_hPaste, W - m - bw, y + eh - bh, bw, bh);
+    mv(g_hUrl, m, y, W - 2 * m, eh);
     y += eh + S(12);
 
     int lblW = S(44);
@@ -984,9 +982,12 @@ static void Layout() {
     mv(g_hBrowse, W - m - bw, y, bw, bh);
     y += bh + S(10);
 
-    mv(g_hPlaylist, m, y + (bh - lh) / 2, S(240), lh);
+    int aw = S(150);
+    mv(g_hAdd, m, y, aw, bh);
+    int px = m + aw + S(14);
+    mv(g_hPlaylist, px, y + (bh - lh) / 2, S(170), lh);
     {
-        int bx = m + S(250), bwid = S(90), bhh = S(8);
+        int bx = px + S(180), bwid = S(90), bhh = S(8);
         int tx = bx + bwid + S(10);
         mv(g_hBusy, bx, y + (bh - bhh) / 2, bwid, bhh);
         mv(g_hBusyTxt, tx, y + (bh - lh) / 2, std::max(S(10), W - m - 2 * bw - 2 * g - tx), lh);
@@ -1193,7 +1194,7 @@ static const wchar_t* StateText(TaskState s) {
     switch (s) {
     case TS_EXPANDING: return L"读取列表…";
     case TS_QUEUED: return L"等待中";
-    case TS_STARTING: return L"解析中…";
+    case TS_STARTING: return L"准备中…";
     case TS_DOWNLOADING: return L"下载中";
     case TS_PROCESSING: return L"处理中…";
     case TS_DONE: return L"已完成";
@@ -1248,22 +1249,6 @@ static void DrawProgressCell(HDC hdc, int item) {
 
     if (st == TS_DONE) pct = 100;
     int state = (st == TS_FAILED) ? PBFS_ERROR : (st == TS_CANCELED) ? PBFS_PAUSED : PBFS_NORMAL;
-    if (st == TS_STARTING && pct <= 0) {
-        // indeterminate: a short chunk sliding across while yt-dlp reads the video
-        int w = bar.right - bar.left, cw = std::max(S(12), w / 4);
-        int pos = (int)((GetTickCount() / 8) % (DWORD)(w + cw)) - cw;
-        RECT in = bar;
-        if (g_progTheme) {
-            DrawThemeBackground(g_progTheme, hdc, PP_BAR, 0, &bar, nullptr);
-            GetThemeBackgroundContentRect(g_progTheme, hdc, PP_BAR, 0, &bar, &in);
-        } else { FrameRect(hdc, &bar, GetSysColorBrush(COLOR_BTNSHADOW)); InflateRect(&in, -1, -1); }
-        RECT c = { std::max(in.left, in.left + pos), in.top, std::min(in.right, in.left + pos + cw), in.bottom };
-        if (c.right > c.left) {
-            if (g_progTheme) DrawThemeBackground(g_progTheme, hdc, PP_FILL, PBFS_NORMAL, &c, nullptr);
-            else FillRect(hdc, &c, GetSysColorBrush(COLOR_HIGHLIGHT));
-        }
-        return;
-    }
     if (g_progTheme) {
         DrawThemeBackground(g_progTheme, hdc, PP_BAR, 0, &bar, nullptr);
         RECT in; GetThemeBackgroundContentRect(g_progTheme, hdc, PP_BAR, 0, &bar, &in);
@@ -1318,7 +1303,7 @@ static void ShowSelectionInfo() {
 
 static void OnTimer() {
     std::vector<int> dirty;
-    int active = 0, queued = 0, reading = 0, starting = 0;
+    int active = 0, queued = 0, reading = 0;
     double speed = 0, pctSum = 0;
     {
         std::lock_guard<std::mutex> lk(g_mx);
@@ -1326,8 +1311,6 @@ static void OnTimer() {
         for (int i = 0; i < (int)g_tasks.size(); ++i) {
             Task& t = *g_tasks[i];
             if (t.dirty) { dirty.push_back(i); t.dirty = false; g_saveDue = true; }
-            else if (t.st == TS_STARTING) dirty.push_back(i);          // animated "parsing" bar
-            if (t.st == TS_STARTING) ++starting;
             if (IsActive(t.st)) { ++active; pctSum += t.pct; if (t.speed > 0 && t.st == TS_DOWNLOADING) speed += t.speed; }
             else if (t.st == TS_QUEUED) ++queued;
         }
@@ -1341,7 +1324,7 @@ static void OnTimer() {
     if (reading) cnt = L"读取列表 " + std::to_wstring(reading) + L" · " + cnt;
     {
         static int lastBusy = -1;
-        int busy = reading + starting;
+        int busy = reading;           // links already in the list are not shown as parsing
         if (busy != lastBusy) {
             if (busy) {
                 std::wstring b = L"正在解析 " + std::to_wstring(busy) + L" 个链接…";
@@ -1500,6 +1483,43 @@ static HWND MakeCtl(const wchar_t* cls, const wchar_t* text, DWORD style, int id
                            (HMENU)(INT_PTR)id, g_hInst, nullptr);
 }
 
+// Edit boxes get a short Chinese context menu instead of the system one
+// (which adds reading order / Unicode control characters / IME entries).
+static LRESULT CALLBACK EditMenuProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR, DWORD_PTR) {
+    if (msg == WM_CONTEXTMENU) {
+        SetFocus(h);
+        DWORD a = 0, b = 0;
+        SendMessageW(h, EM_GETSEL, (WPARAM)&a, (LPARAM)&b);
+        bool sel = b > a, ro = (GetWindowLongW(h, GWL_STYLE) & ES_READONLY) != 0;
+        bool any = GetWindowTextLengthW(h) > 0;
+        bool clip = IsClipboardFormatAvailable(CF_UNICODETEXT) != 0;
+        HMENU m = CreatePopupMenu();
+        auto on = [](bool e) { return MF_STRING | (e ? 0u : (UINT)MF_GRAYED); };
+        AppendMenuW(m, on(!ro && SendMessageW(h, EM_CANUNDO, 0, 0)), 1, L"撤销");
+        AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+        AppendMenuW(m, on(sel && !ro), 2, L"剪切");
+        AppendMenuW(m, on(sel), 3, L"复制");
+        AppendMenuW(m, on(clip && !ro), 4, L"粘贴");
+        AppendMenuW(m, on(sel && !ro), 5, L"删除");
+        AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+        AppendMenuW(m, on(any), 6, L"全选");
+        int x = GET_X_LPARAM(lp), y = GET_Y_LPARAM(lp);
+        if (x == -1 && y == -1) { RECT r; GetWindowRect(h, &r); x = r.left + S(8); y = r.top + S(8); }
+        int c = TrackPopupMenu(m, TPM_RETURNCMD | TPM_RIGHTBUTTON, x, y, 0, h, nullptr);
+        DestroyMenu(m);
+        switch (c) {
+        case 1: SendMessageW(h, WM_UNDO, 0, 0); break;
+        case 2: SendMessageW(h, WM_CUT, 0, 0); break;
+        case 3: SendMessageW(h, WM_COPY, 0, 0); break;
+        case 4: SendMessageW(h, WM_PASTE, 0, 0); break;
+        case 5: SendMessageW(h, WM_CLEAR, 0, 0); break;
+        case 6: SendMessageW(h, EM_SETSEL, 0, -1); break;
+        }
+        return 0;
+    }
+    return DefSubclassProc(h, msg, wp, lp);
+}
+
 static void OnCreate(HWND hwnd) {
     g_hwnd = hwnd;
     g_dpi = GetDpiForWindow(hwnd);
@@ -1507,8 +1527,7 @@ static void OnCreate(HWND hwnd) {
 
     g_hUrlLbl  = MakeCtl(WC_STATICW, L"视频链接（支持一次粘贴多个，按 Enter 添加）", SS_LEFT | SS_NOPREFIX, IDC_URLLBL);
     g_hUrl     = MakeCtl(WC_EDITW, L"", WS_TABSTOP | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL, IDC_URL, WS_EX_CLIENTEDGE);
-    g_hAdd     = MakeCtl(WC_BUTTONW, L"添加下载", WS_TABSTOP | BS_DEFPUSHBUTTON, IDC_ADD);
-    g_hPaste   = MakeCtl(WC_BUTTONW, L"粘贴并下载", WS_TABSTOP | BS_PUSHBUTTON, IDC_PASTE);
+    g_hAdd     = MakeCtl(WC_BUTTONW, L"解析并添加下载", WS_TABSTOP | BS_DEFPUSHBUTTON, IDC_ADD);
     g_hFmtLbl  = MakeCtl(WC_STATICW, L"格式", SS_LEFT, IDC_FMTLBL);
     g_hFmt     = MakeCtl(WC_COMBOBOXW, L"", WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST, IDC_FMT);
     g_hDirLbl  = MakeCtl(WC_STATICW, L"保存到", SS_LEFT, IDC_DIRLBL);
@@ -1524,6 +1543,8 @@ static void OnCreate(HWND hwnd) {
     g_hBusyTxt = MakeCtl(WC_STATICW, L"", SS_LEFT | SS_NOPREFIX | SS_ENDELLIPSIS, IDC_BUSYTXT);
     ShowWindow(g_hBusy, SW_HIDE); ShowWindow(g_hBusyTxt, SW_HIDE);
 
+    SetWindowSubclass(g_hUrl, EditMenuProc, 1, 0);
+    SetWindowSubclass(g_hDir, EditMenuProc, 1, 0);
     for (int i = 0; i < kFormatCount; ++i) SendMessageW(g_hFmt, CB_ADDSTRING, 0, (LPARAM)g_formats[i].name);
     SendMessageW(g_hFmt, CB_SETCURSEL, (g_set.fmt >= 0 && g_set.fmt < kFormatCount) ? g_set.fmt : 0, 0);
     Button_SetCheck(g_hPlaylist, g_set.playlist ? BST_CHECKED : BST_UNCHECKED);
@@ -1549,7 +1570,7 @@ static void OnCreate(HWND hwnd) {
     RefreshListCount();
     { int n = TaskCount(); if (n) { g_statusMsg = L"已恢复 " + std::to_wstring(n) + L" 个任务"; SetStatusPart(0, g_statusMsg); } }
     Pump();
-    SetTimer(hwnd, 1, 100, nullptr);
+    SetTimer(hwnd, 1, 250, nullptr);
     SetFocus(g_hUrl);
 }
 
@@ -1749,7 +1770,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         if ((HWND)wp == g_hList) { ShowContextMenu(GET_X_LPARAM(lp), GET_Y_LPARAM(lp)); return 0; }
         break;
     case WM_TIMER:
-        if (wp == 2) { KillTimer(hwnd, 2); SetWindowTextW(g_hAdd, L"添加下载"); return 0; }
+        if (wp == 2) { KillTimer(hwnd, 2); SetWindowTextW(g_hAdd, L"解析并添加下载"); return 0; }
         OnTimer();
         return 0;
     case WM_APP_EXPANDED:
