@@ -795,12 +795,6 @@ static void LoadTasks() {
     }
 }
 
-// caller holds g_mx
-    t->st = TS_EXPANDING; t->cancel = false; t->err.clear(); t->dirty = true;
-    t->title = L"正在读取列表… " + t->url;
-    std::thread(Expander, t, g_ytdlp, g_hwnd).detach();
-}
-
 // ---------------------------------------------------------------------------
 // Component download (yt-dlp.exe / ffmpeg)
 // ---------------------------------------------------------------------------
