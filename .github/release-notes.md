@@ -1,9 +1,7 @@
 ## What's new / 更新内容
 
-- **yt-dlp and ffmpeg are now included.** Nothing to download on first run: 4K, merging, and MP3 work right away. They live in the `tools` folder next to `YtGrab.exe`.
-  **内置 yt-dlp 和 ffmpeg。** 首次运行无需再下载，4K、音视频合并、转 MP3 开箱即用，组件放在 `YtGrab.exe` 旁边的 `tools` 文件夹里。
-- ARM64 package uses native ARM64 builds of yt-dlp and ffmpeg.
-  ARM64 版使用原生 ARM64 的 yt-dlp 和 ffmpeg。
+- **Updated yt-dlp to 2026.10.26**, which includes security fixes. ffmpeg refreshed to the latest build.
+  **yt-dlp 升级到 2026.10.26**，包含安全修复；ffmpeg 同步更新到最新构建。
 
 ## Download / 下载
 
