@@ -44,7 +44,7 @@
 // ---------------------------------------------------------------------------
 enum {
     IDC_URLLBL = 200, IDC_URL, IDC_PASTE, IDC_FMTLBL, IDC_FMT, IDC_DIRLBL, IDC_DIR,
-    IDC_BROWSE, IDC_PLAYLIST, IDC_SETTINGS, IDC_OPENDIR, IDC_LIST, IDC_STATUS,
+    IDC_BROWSE, IDC_PLAYLIST, IDC_SETTINGS, IDC_OPENDIR, IDC_LIST, IDC_STATUS, IDC_BUSY, IDC_BUSYTXT,
     ID_OPENFILE = 300, ID_OPENFOLDER, ID_COPYURL, ID_RETRY, ID_CANCELTASK, ID_REMOVE,
     ID_CLEARDONE, ID_SELALL, ID_UPDATE_YTDLP, ID_GET_FFMPEG, ID_GET_YTDLP
 };
@@ -267,7 +267,7 @@ static bool IsActive(TaskState s) { return s == TS_STARTING || s == TS_DOWNLOADI
 // ---------------------------------------------------------------------------
 static HINSTANCE g_hInst;
 static HWND g_hwnd, g_hUrlLbl, g_hUrl, g_hAdd, g_hPaste, g_hFmtLbl, g_hFmt, g_hDirLbl, g_hDir, g_hBrowse,
-            g_hPlaylist, g_hSettings, g_hOpenDir, g_hList, g_hStatus;
+            g_hPlaylist, g_hSettings, g_hOpenDir, g_hList, g_hStatus, g_hBusy, g_hBusyTxt;
 static HWND g_hSettingsDlg;
 static HFONT g_font;
 static UINT g_dpi = 96;
@@ -959,7 +959,7 @@ static void Layout() {
     RECT cr; GetWindowRect(g_hFmt, &cr);
     int ch = cr.bottom - cr.top;                 // closed combo height drives row height
     int m = S(14), g = S(8), bw = S(112), bh = std::max(ch + S(2), S(30)), lh = S(20);
-    HDWP dw = BeginDeferWindowPos(16);
+    HDWP dw = BeginDeferWindowPos(18);
     auto mv = [&](HWND h, int x, int y, int w, int hh) { dw = DeferWindowPos(dw, h, nullptr, x, y, w, hh, SWP_NOZORDER | SWP_NOACTIVATE); };
 
     int y = m;
@@ -985,6 +985,12 @@ static void Layout() {
     y += bh + S(10);
 
     mv(g_hPlaylist, m, y + (bh - lh) / 2, S(240), lh);
+    {
+        int bx = m + S(250), bwid = S(90), bhh = S(8);
+        int tx = bx + bwid + S(10);
+        mv(g_hBusy, bx, y + (bh - bhh) / 2, bwid, bhh);
+        mv(g_hBusyTxt, tx, y + (bh - lh) / 2, std::max(S(10), W - m - 2 * bw - 2 * g - tx), lh);
+    }
     mv(g_hSettings, W - m - bw, y, bw, bh);
     mv(g_hOpenDir, W - m - 2 * bw - g, y, bw, bh);
     y += bh + S(12);
@@ -1048,10 +1054,16 @@ static void AddFromText(const std::wstring& text) {
         return;
     }
     ReadUiSettings();
-    int last;
+    int last, added = 0, dup = 0;
     {
         std::lock_guard<std::mutex> lk(g_mx);
         for (auto& u : urls) {
+            bool seen = false;
+            for (auto& p : g_pending) if (p->url == u) seen = true;
+            for (auto& x : g_tasks)
+                if (x->url == u && x->st != TS_DONE && x->st != TS_FAILED && x->st != TS_CANCELED) seen = true;
+            if (seen) { ++dup; continue; }
+            ++added;
             auto t = std::make_shared<Task>();
             t->id = g_nextId++;
             t->url = u; t->outDir = g_set.outDir; t->fmt = g_set.fmt; t->playlist = g_set.playlist;
@@ -1063,8 +1075,12 @@ static void AddFromText(const std::wstring& text) {
     }
     RefreshListCount();
     if (last >= 0) ListView_EnsureVisible(g_hList, last, FALSE);
-    g_statusMsg = L"已添加 " + std::to_wstring(urls.size()) + L" 个链接";
+    g_statusMsg = !added ? std::wstring(L"这个链接已在下载列表中")
+                : L"已添加 " + std::to_wstring(added) + L" 个链接" + (dup ? L"，" + std::to_wstring(dup) + L" 个已在列表中" : L"");
     SetStatusPart(0, g_statusMsg);
+    SetWindowTextW(g_hAdd, added ? L"✓ 已添加" : L"已在列表中");
+    SetTimer(g_hwnd, 2, 1500, nullptr);
+    if (!added) { MessageBeep(MB_ICONINFORMATION); return; }
     if (g_ytdlp.empty()) PromptYtdlp(); else Pump();
 }
 
@@ -1232,6 +1248,22 @@ static void DrawProgressCell(HDC hdc, int item) {
 
     if (st == TS_DONE) pct = 100;
     int state = (st == TS_FAILED) ? PBFS_ERROR : (st == TS_CANCELED) ? PBFS_PAUSED : PBFS_NORMAL;
+    if (st == TS_STARTING && pct <= 0) {
+        // indeterminate: a short chunk sliding across while yt-dlp reads the video
+        int w = bar.right - bar.left, cw = std::max(S(12), w / 4);
+        int pos = (int)((GetTickCount() / 8) % (DWORD)(w + cw)) - cw;
+        RECT in = bar;
+        if (g_progTheme) {
+            DrawThemeBackground(g_progTheme, hdc, PP_BAR, 0, &bar, nullptr);
+            GetThemeBackgroundContentRect(g_progTheme, hdc, PP_BAR, 0, &bar, &in);
+        } else { FrameRect(hdc, &bar, GetSysColorBrush(COLOR_BTNSHADOW)); InflateRect(&in, -1, -1); }
+        RECT c = { std::max(in.left, in.left + pos), in.top, std::min(in.right, in.left + pos + cw), in.bottom };
+        if (c.right > c.left) {
+            if (g_progTheme) DrawThemeBackground(g_progTheme, hdc, PP_FILL, PBFS_NORMAL, &c, nullptr);
+            else FillRect(hdc, &c, GetSysColorBrush(COLOR_HIGHLIGHT));
+        }
+        return;
+    }
     if (g_progTheme) {
         DrawThemeBackground(g_progTheme, hdc, PP_BAR, 0, &bar, nullptr);
         RECT in; GetThemeBackgroundContentRect(g_progTheme, hdc, PP_BAR, 0, &bar, &in);
@@ -1286,7 +1318,7 @@ static void ShowSelectionInfo() {
 
 static void OnTimer() {
     std::vector<int> dirty;
-    int active = 0, queued = 0, reading = 0;
+    int active = 0, queued = 0, reading = 0, starting = 0;
     double speed = 0, pctSum = 0;
     {
         std::lock_guard<std::mutex> lk(g_mx);
@@ -1294,6 +1326,8 @@ static void OnTimer() {
         for (int i = 0; i < (int)g_tasks.size(); ++i) {
             Task& t = *g_tasks[i];
             if (t.dirty) { dirty.push_back(i); t.dirty = false; g_saveDue = true; }
+            else if (t.st == TS_STARTING) dirty.push_back(i);          // animated "parsing" bar
+            if (t.st == TS_STARTING) ++starting;
             if (IsActive(t.st)) { ++active; pctSum += t.pct; if (t.speed > 0 && t.st == TS_DOWNLOADING) speed += t.speed; }
             else if (t.st == TS_QUEUED) ++queued;
         }
@@ -1305,6 +1339,24 @@ static void OnTimer() {
     static std::wstring lastCnt, lastSpd;
     std::wstring cnt = L"下载中 " + std::to_wstring(active) + L" · 等待 " + std::to_wstring(queued);
     if (reading) cnt = L"读取列表 " + std::to_wstring(reading) + L" · " + cnt;
+    {
+        static int lastBusy = -1;
+        int busy = reading + starting;
+        if (busy != lastBusy) {
+            if (busy) {
+                std::wstring b = L"正在解析 " + std::to_wstring(busy) + L" 个链接…";
+                SetWindowTextW(g_hBusyTxt, b.c_str());
+                if (lastBusy <= 0) {
+                    ShowWindow(g_hBusy, SW_SHOWNA); ShowWindow(g_hBusyTxt, SW_SHOWNA);
+                    SendMessageW(g_hBusy, PBM_SETMARQUEE, TRUE, 30);
+                }
+            } else {
+                SendMessageW(g_hBusy, PBM_SETMARQUEE, FALSE, 0);
+                ShowWindow(g_hBusy, SW_HIDE); ShowWindow(g_hBusyTxt, SW_HIDE);
+            }
+            lastBusy = busy;
+        }
+    }
     if (g_saveDue2) { g_saveDue = true; g_saveDue2 = false; }
     if (g_saveDue && GetTickCount() - g_lastSave > 3000) SaveTasks();
     std::wstring spd = active ? FmtBytes(speed) + L"/s" : L"";
@@ -1467,6 +1519,10 @@ static void OnCreate(HWND hwnd) {
     g_hSettings= MakeCtl(WC_BUTTONW, L"设置…", WS_TABSTOP | BS_PUSHBUTTON, IDC_SETTINGS);
     g_hList    = MakeCtl(WC_LISTVIEWW, L"", WS_TABSTOP | LVS_REPORT | LVS_OWNERDATA | LVS_SHOWSELALWAYS, IDC_LIST, WS_EX_CLIENTEDGE);
     g_hStatus  = MakeCtl(STATUSCLASSNAMEW, L"", SBARS_SIZEGRIP, IDC_STATUS);
+    // "parsing" indicator: visible while links are read, so every click gets feedback
+    g_hBusy    = MakeCtl(PROGRESS_CLASSW, L"", PBS_MARQUEE, IDC_BUSY);
+    g_hBusyTxt = MakeCtl(WC_STATICW, L"", SS_LEFT | SS_NOPREFIX | SS_ENDELLIPSIS, IDC_BUSYTXT);
+    ShowWindow(g_hBusy, SW_HIDE); ShowWindow(g_hBusyTxt, SW_HIDE);
 
     for (int i = 0; i < kFormatCount; ++i) SendMessageW(g_hFmt, CB_ADDSTRING, 0, (LPARAM)g_formats[i].name);
     SendMessageW(g_hFmt, CB_SETCURSEL, (g_set.fmt >= 0 && g_set.fmt < kFormatCount) ? g_set.fmt : 0, 0);
@@ -1493,7 +1549,7 @@ static void OnCreate(HWND hwnd) {
     RefreshListCount();
     { int n = TaskCount(); if (n) { g_statusMsg = L"已恢复 " + std::to_wstring(n) + L" 个任务"; SetStatusPart(0, g_statusMsg); } }
     Pump();
-    SetTimer(hwnd, 1, 250, nullptr);
+    SetTimer(hwnd, 1, 100, nullptr);
     SetFocus(g_hUrl);
 }
 
@@ -1693,6 +1749,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         if ((HWND)wp == g_hList) { ShowContextMenu(GET_X_LPARAM(lp), GET_Y_LPARAM(lp)); return 0; }
         break;
     case WM_TIMER:
+        if (wp == 2) { KillTimer(hwnd, 2); SetWindowTextW(g_hAdd, L"添加下载"); return 0; }
         OnTimer();
         return 0;
     case WM_APP_EXPANDED:
