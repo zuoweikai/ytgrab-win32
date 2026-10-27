@@ -1,7 +1,11 @@
 ## What's new / 更新内容
 
-- **Playlists and channels become one task per video.** With "Download whole playlist" checked, a playlist, a channel, or a channel's Playlists page (e.g. `youtube.com/@name/playlists`) is read first and every video gets its own row with its own progress. Videos are saved in a subfolder named after their playlist.
-  **播放列表和频道展开为每个视频一条任务。** 勾选「下载整个播放列表」后，播放列表、频道或频道的「播放列表」页（如 `youtube.com/@name/playlists`）会先读出全部视频，每个视频单独一行、单独显示进度，并按播放列表名存到子文件夹。
+- **Your task list survives a restart.** Tasks are saved automatically; finished ones stay in the list, and unfinished downloads resume when you open YtGrab again.
+  **关闭软件后任务不再丢失。** 任务列表自动保存，已完成的保留在列表中，未完成的下次打开自动继续下载。
+- **Reading a playlist no longer adds a placeholder row.** The status bar shows "Reading lists N" until the videos appear in the list.
+  **读取列表时不再在表格里放占位行**，状态栏显示「读取列表 N」，读完后直接出现视频任务。
+- Playlists and channels become one task per video (since the previous version), saved in a subfolder per playlist.
+  播放列表和频道展开为每个视频一条任务，按播放列表名存到子文件夹。
 - Includes Deno, yt-dlp 2026.10.26 and latest ffmpeg.
   内置 Deno、yt-dlp 2026.10.26 与最新 ffmpeg。
 
