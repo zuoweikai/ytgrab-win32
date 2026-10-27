@@ -58,6 +58,131 @@ enum {
 };
 
 static const wchar_t* kAppName  = L"YtGrab 视频下载器";
+
+// ---------------------------------------------------------------------------
+// UI language: Chinese strings are the keys; English comes from this table.
+// ---------------------------------------------------------------------------
+static bool g_en = false;
+struct TrPair { const wchar_t* zh; const wchar_t* en; };
+static const TrPair EN_TABLE[] = {
+    { L"YtGrab 视频下载器", L"YtGrab Video Downloader" },
+    { L"最佳画质（视频 + 音频）", L"Best quality (video + audio)" },
+    { L"MP4 兼容（H.264，≤1080p）", L"MP4 compatible (H.264, ≤1080p)" },
+    { L"仅音频 · MP3", L"Audio only · MP3" },
+    { L"仅音频 · M4A", L"Audio only · M4A" },
+    { L"仅音频 · 原始格式", L"Audio only · original" },
+    { L"名称", L"Name" },
+    { L"状态", L"Status" },
+    { L"进度", L"Progress" },
+    { L"大小", L"Size" },
+    { L"速度", L"Speed" },
+    { L"剩余", L"ETA" },
+    { L"信息", L"Info" },
+    { L"无法启动 yt-dlp：", L"Cannot start yt-dlp: " },
+    { L"yt-dlp 退出代码 ", L"yt-dlp exit code " },
+    { L"列表里没有视频", L"No videos in this list" },
+    { L"正在下载 ", L"Downloading " },
+    { L"yt-dlp 已安装到 ", L"yt-dlp installed to " },
+    { L"yt-dlp 下载失败，请检查网络或代理（使用系统代理设置）。", L"Failed to download yt-dlp. Check your network or proxy (system proxy settings are used)." },
+    { L"ffmpeg 下载失败，请检查网络或代理。", L"Failed to download ffmpeg. Check your network or proxy." },
+    { L"正在解压 ffmpeg…", L"Extracting ffmpeg…" },
+    { L"ffmpeg 已安装到 ", L"ffmpeg installed to " },
+    { L"ffmpeg 解压失败（需要 Windows 10 1803 及以上自带的 tar）。", L"Failed to extract ffmpeg (needs the tar built into Windows 10 1803 or later)." },
+    { L"正在更新 yt-dlp…", L"Updating yt-dlp…" },
+    { L"yt-dlp 更新完成", L"yt-dlp updated" },
+    { L"yt-dlp：未找到", L"yt-dlp: not found" },
+    { L"ffmpeg：未找到", L"ffmpeg: not found" },
+    { L"ffmpeg：就绪", L"ffmpeg: ready" },
+    { L"没有找到 yt-dlp.exe。\n\n是否现在从 GitHub 自动下载最新版（约 18 MB）？\n也可以手动把 yt-dlp.exe 放在本程序同一目录下。", L"yt-dlp.exe was not found.\n\nDownload the latest version from GitHub now (about 18 MB)?\nYou can also put yt-dlp.exe in the same folder as this program." },
+    { L"没有识别到 http/https 链接", L"No http/https link found" },
+    { L"这个链接已在下载列表中", L"That link is already in the list" },
+    { L"已添加 ", L"Added " },
+    { L" 个链接", L" link(s)" },
+    { L"，", L", " },
+    { L" 个已在列表中", L" already in the list" },
+    { L"✓ 已添加", L"✓ Added" },
+    { L"已在列表中", L"Already in list" },
+    { L"选择保存位置", L"Choose download folder" },
+    { L"读取列表…", L"Reading list…" },
+    { L"等待中", L"Queued" },
+    { L"准备中…", L"Preparing…" },
+    { L"下载中", L"Downloading" },
+    { L"处理中…", L"Processing…" },
+    { L"已完成", L"Done" },
+    { L"失败", L"Failed" },
+    { L"已取消", L"Canceled" },
+    { L"错误：", L"Error: " },
+    { L"已选择 ", L"" },
+    { L" 项", L" selected" },
+    { L"下载中 ", L"Downloading " },
+    { L" · 等待 ", L" · Queued " },
+    { L"读取列表 ", L"Reading lists " },
+    { L"正在解析 ", L"Parsing " },
+    { L" 个链接…", L" link(s)…" },
+    { L"打开文件\tEnter", L"Open file\tEnter" },
+    { L"打开所在文件夹", L"Show in folder" },
+    { L"重新下载", L"Download again" },
+    { L"取消", L"Cancel" },
+    { L"复制链接", L"Copy link" },
+    { L"移除\tDel", L"Remove\tDel" },
+    { L"清除已完成", L"Clear finished" },
+    { L"全选\tCtrl+A", L"Select all\tCtrl+A" },
+    { L"不使用", L"None" },
+    { L"例如 5M，留空不限速", L"e.g. 5M, empty = unlimited" },
+    { L"例如 http://127.0.0.1:7890", L"e.g. http://127.0.0.1:7890" },
+    { L"留空自动查找", L"Empty = find automatically" },
+    { L"ffmpeg 未安装（合并高清需要）", L"ffmpeg missing (needed for HD merging)" },
+    { L"ffmpeg 已就绪", L"ffmpeg ready" },
+    { L"进度见主窗口状态栏", L"See progress in the main status bar" },
+    { L"约 200 MB，进度见状态栏", L"About 200 MB, see status bar" },
+    { L"撤销", L"Undo" },
+    { L"剪切", L"Cut" },
+    { L"复制", L"Copy" },
+    { L"粘贴", L"Paste" },
+    { L"删除", L"Delete" },
+    { L"全选", L"Select all" },
+    { L"视频链接（支持一次粘贴多个，按 Enter 添加）", L"Video links (paste several at once, press Enter to add)" },
+    { L"解析并添加下载", L"Parse && add" },
+    { L"格式", L"Format" },
+    { L"保存到", L"Save to" },
+    { L"浏览…", L"Browse…" },
+    { L"下载整个播放列表", L"Whole playlist" },
+    { L"打开文件夹", L"Open folder" },
+    { L"设置…", L"Settings…" },
+    { L"选择保存目录", L"Choose download folder" },
+    { L"就绪", L"Ready" },
+    { L"已恢复 ", L"Restored " },
+    { L" 个任务", L" task(s)" },
+    { L"还没有下载任务。粘贴视频链接后点击「解析并添加下载」，或在列表中按 Ctrl+V。", L"No downloads yet. Paste video links and click \"Parse & add\", or press Ctrl+V in the list." },
+    { L"还有 ", L"" },
+    { L" 个任务正在下载，退出将暂停它们，下次打开会自动继续。确定退出吗？", L" download(s) still running. Quitting pauses them and they resume next time. Quit now?" },
+    { L"列表已展开为 ", L"List expanded into " },
+    { L" 个下载任务", L" downloads" },
+    { L"完成", L"Done" },
+    { L"失败，详见状态栏", L"Failed, see status bar" },
+    { L"设置", L"Settings" },
+    { L"下载", L"Downloads" },
+    { L"同时下载任务数：", L"Parallel downloads:" },
+    { L"每个任务的分片线程：", L"Fragments per task:" },
+    { L"限速：", L"Rate limit:" },
+    { L"下载字幕（中文 / 英文）", L"Subtitles (Chinese / English)" },
+    { L"嵌入封面", L"Embed thumbnail" },
+    { L"网络", L"Network" },
+    { L"代理：", L"Proxy:" },
+    { L"使用浏览器 Cookies：", L"Browser cookies:" },
+    { L"组件", L"Components" },
+    { L"yt-dlp 路径：", L"yt-dlp path:" },
+    { L"更新 yt-dlp", L"Update yt-dlp" },
+    { L"下载 ffmpeg", L"Get ffmpeg" },
+    { L"确定", L"OK" },
+    { L"界面语言：", L"Language:" },
+    { L"跟随系统", L"System default" }
+};
+static const wchar_t* T(const wchar_t* zh) {
+    if (!g_en || !zh) return zh;
+    for (auto& p : EN_TABLE) if (wcscmp(p.zh, zh) == 0) return p.en;
+    return zh;
+}
 static const wchar_t* kClass    = L"YtGrabMainWnd";
 static const wchar_t* kYtdlpUrl = L"https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
 static const wchar_t* kFfmpegUrl= L"https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
@@ -164,7 +289,7 @@ static std::wstring DirOf(const std::wstring& p) {
 // ---------------------------------------------------------------------------
 struct Settings {
     std::wstring outDir, proxy, cookies, rate, ytdlpPath;
-    int fmt = 0, conc = 3, frag = 4;
+    int fmt = 0, conc = 3, frag = 4, lang = 0;   // lang: 0 system, 1 中文, 2 English
     bool playlist = false, subs = false, thumb = false;
     int x = CW_USEDEFAULT, y = CW_USEDEFAULT, w = 0, h = 0; bool maximized = false;
 };
@@ -204,6 +329,8 @@ static void LoadSettings() {
     g_set.x = IniInt(L"WinX", (int)CW_USEDEFAULT); g_set.y = IniInt(L"WinY", (int)CW_USEDEFAULT);
     g_set.w = IniInt(L"WinW", 0); g_set.h = IniInt(L"WinH", 0);
     g_set.maximized = IniInt(L"WinMax", 0) != 0;
+    g_set.lang = std::max(0, std::min(2, IniInt(L"Language", 0)));
+    g_en = g_set.lang == 2 || (g_set.lang == 0 && PRIMARYLANGID(GetUserDefaultUILanguage()) != LANG_CHINESE);
 }
 static void SaveSettings() {
     IniPut(L"OutDir", g_set.outDir);   IniPut(L"Proxy", g_set.proxy);
@@ -214,6 +341,7 @@ static void SaveSettings() {
     IniPut(L"Subtitles", g_set.subs);  IniPut(L"Thumbnail", g_set.thumb);
     IniPut(L"WinX", g_set.x); IniPut(L"WinY", g_set.y); IniPut(L"WinW", g_set.w); IniPut(L"WinH", g_set.h);
     IniPut(L"WinMax", g_set.maximized);
+    IniPut(L"Language", g_set.lang);
 }
 
 // ---------------------------------------------------------------------------
@@ -485,7 +613,7 @@ static void Worker(std::shared_ptr<Task> t, std::wstring exe, std::wstring args,
     Child c;
     if (!SpawnChild(exe, Q(exe) + L" " + args, t->outDir, c)) {
         std::lock_guard<std::mutex> lk(g_mx);
-        t->st = TS_FAILED; t->err = L"无法启动 yt-dlp：" + exe; t->dirty = true;
+        t->st = TS_FAILED; t->err = T(L"无法启动 yt-dlp：") + exe; t->dirty = true;
         PostMessageW(hwnd, WM_APP_DONE, 0, 0);
         return;
     }
@@ -505,7 +633,7 @@ static void Worker(std::shared_ptr<Task> t, std::wstring exe, std::wstring args,
         else if (code == 0) { t->st = TS_DONE; t->pct = 100; }
         else {
             t->st = TS_FAILED;
-            if (t->err.empty()) t->err = L"yt-dlp 退出代码 " + std::to_wstring((int)code);
+            if (t->err.empty()) t->err = T(L"yt-dlp 退出代码 ") + std::to_wstring((int)code);
         }
         t->speed = -1; t->eta = -1; t->dirty = true;
     }
@@ -631,7 +759,7 @@ static bool ListEntries(const std::wstring& exe, const std::wstring& url, int de
         }
     }
     if (found.empty()) {
-        if (err.empty()) err = code == 0 ? L"列表里没有视频" : L"yt-dlp 退出代码 " + std::to_wstring((int)code);
+        if (err.empty()) err = code == 0 ? T(L"列表里没有视频") : T(L"yt-dlp 退出代码 ") + std::to_wstring((int)code);
         return false;
     }
     for (auto& en : found) {
@@ -852,14 +980,14 @@ static void ComponentThread(int which) {
     if (which == ID_GET_YTDLP) {
         std::wstring dst = dir + L"\\yt-dlp.exe", part = dst + L".part";
         if (Fetch(kYtdlpUrl, part, L"yt-dlp") && MoveFileExW(part.c_str(), dst.c_str(), MOVEFILE_REPLACE_EXISTING))
-            PostComp(1, L"yt-dlp 已安装到 " + dir);
-        else { DeleteFileW(part.c_str()); PostComp(2, L"yt-dlp 下载失败，请检查网络或代理（使用系统代理设置）。"); }
+            PostComp(1, T(L"yt-dlp 已安装到 ") + dir);
+        else { DeleteFileW(part.c_str()); PostComp(2, T(L"yt-dlp 下载失败，请检查网络或代理（使用系统代理设置）。")); }
     } else if (which == ID_GET_FFMPEG) {
         wchar_t tmp[MAX_PATH]; GetTempPathW(MAX_PATH, tmp);
         std::wstring zip = std::wstring(tmp) + L"ytgrab-ffmpeg.zip";
         std::wstring ex  = std::wstring(tmp) + L"ytgrab-ffmpeg";
-        if (!Fetch(kFfmpegUrl, zip, L"ffmpeg")) { PostComp(2, L"ffmpeg 下载失败，请检查网络或代理。"); CoUninitialize(); return; }
-        PostComp(0, L"正在解压 ffmpeg…");
+        if (!Fetch(kFfmpegUrl, zip, L"ffmpeg")) { PostComp(2, T(L"ffmpeg 下载失败，请检查网络或代理。")); CoUninitialize(); return; }
+        PostComp(0, T(L"正在解压 ffmpeg…"));
         DeleteTree(ex);
         CreateDirectoryW(ex.c_str(), nullptr);
         wchar_t sys[MAX_PATH]; GetSystemDirectoryW(sys, MAX_PATH);
@@ -884,17 +1012,17 @@ static void ComponentThread(int which) {
         }
         DeleteFileW(zip.c_str());
         DeleteTree(ex);
-        if (ok) PostComp(1, L"ffmpeg 已安装到 " + dir);
-        else    PostComp(2, L"ffmpeg 解压失败（需要 Windows 10 1803 及以上自带的 tar）。");
+        if (ok) PostComp(1, T(L"ffmpeg 已安装到 ") + dir);
+        else    PostComp(2, T(L"ffmpeg 解压失败（需要 Windows 10 1803 及以上自带的 tar）。"));
     } else if (which == ID_UPDATE_YTDLP) {
         if (g_ytdlp.empty()) { CoUninitialize(); ComponentThread(ID_GET_YTDLP); return; }
-        PostComp(0, L"正在更新 yt-dlp…");
+        PostComp(0, T(L"正在更新 yt-dlp…"));
         std::wstring out;
         DWORD code = RunCapture(g_ytdlp, L"-U", out);
         out = Trim(out);
         size_t k = out.find_last_of(L"\n");
         std::wstring last = k == std::wstring::npos ? out : Trim(out.substr(k + 1));
-        PostComp(code == 0 ? 1 : 2, last.empty() ? L"yt-dlp 更新完成" : last);
+        PostComp(code == 0 ? 1 : 2, last.empty() ? T(L"yt-dlp 更新完成") : last);
     }
     CoUninitialize();
 }
@@ -913,8 +1041,8 @@ static void SetStatusPart(int part, const std::wstring& s) {
 }
 
 static void UpdateToolStatus() {
-    SetStatusPart(1, g_ytdlp.empty() ? L"yt-dlp：未找到" : (L"yt-dlp " + (g_ytdlpVer.empty() ? std::wstring(L"…") : g_ytdlpVer)));
-    SetStatusPart(2, g_ffmpeg.empty() ? L"ffmpeg：未找到" : L"ffmpeg：就绪");
+    SetStatusPart(1, g_ytdlp.empty() ? T(L"yt-dlp：未找到") : (L"yt-dlp " + (g_ytdlpVer.empty() ? std::wstring(L"…") : g_ytdlpVer)));
+    SetStatusPart(2, g_ffmpeg.empty() ? T(L"ffmpeg：未找到") : T(L"ffmpeg：就绪"));
 }
 
 static void ApplyFont(HWND parent) {
@@ -1040,9 +1168,8 @@ static void RefreshListCount() {
 
 static void PromptYtdlp() {
     if (g_compBusy) return;
-    int r = MessageBoxW(g_hwnd, L"没有找到 yt-dlp.exe。\n\n是否现在从 GitHub 自动下载最新版（约 18 MB）？\n"
-                                L"也可以手动把 yt-dlp.exe 放在本程序同一目录下。",
-                        kAppName, MB_YESNO | MB_ICONQUESTION);
+    int r = MessageBoxW(g_hwnd, T(L"没有找到 yt-dlp.exe。\n\n是否现在从 GitHub 自动下载最新版（约 18 MB）？\n也可以手动把 yt-dlp.exe 放在本程序同一目录下。"),
+                        T(kAppName), MB_YESNO | MB_ICONQUESTION);
     if (r == IDYES) StartComponent(ID_GET_YTDLP);
 }
 
@@ -1050,7 +1177,7 @@ static void AddFromText(const std::wstring& text) {
     auto urls = ExtractUrls(text);
     if (urls.empty()) {
         MessageBeep(MB_ICONWARNING);
-        g_statusMsg = L"没有识别到 http/https 链接";
+        g_statusMsg = T(L"没有识别到 http/https 链接");
         SetStatusPart(0, g_statusMsg);
         return;
     }
@@ -1077,9 +1204,9 @@ static void AddFromText(const std::wstring& text) {
     RefreshListCount();
     if (last >= 0) ListView_EnsureVisible(g_hList, last, FALSE);
     g_statusMsg = !added ? std::wstring(L"这个链接已在下载列表中")
-                : L"已添加 " + std::to_wstring(added) + L" 个链接" + (dup ? L"，" + std::to_wstring(dup) + L" 个已在列表中" : L"");
+                : T(L"已添加 ") + std::to_wstring(added) + T(L" 个链接") + (dup ? L"，" + std::to_wstring(dup) + T(L" 个已在列表中") : L"");
     SetStatusPart(0, g_statusMsg);
-    SetWindowTextW(g_hAdd, added ? L"✓ 已添加" : L"已在列表中");
+    SetWindowTextW(g_hAdd, added ? T(L"✓ 已添加") : T(L"已在列表中"));
     SetTimer(g_hwnd, 2, 1500, nullptr);
     if (!added) { MessageBeep(MB_ICONINFORMATION); return; }
     if (g_ytdlp.empty()) PromptYtdlp(); else Pump();
@@ -1192,14 +1319,14 @@ static void BrowseFolder(HWND owner, HWND edit) {
 // ---------------------------------------------------------------------------
 static const wchar_t* StateText(TaskState s) {
     switch (s) {
-    case TS_EXPANDING: return L"读取列表…";
-    case TS_QUEUED: return L"等待中";
-    case TS_STARTING: return L"准备中…";
-    case TS_DOWNLOADING: return L"下载中";
-    case TS_PROCESSING: return L"处理中…";
-    case TS_DONE: return L"已完成";
-    case TS_FAILED: return L"失败";
-    case TS_CANCELED: return L"已取消";
+    case TS_EXPANDING: return T(L"读取列表…");
+    case TS_QUEUED: return T(L"等待中");
+    case TS_STARTING: return T(L"准备中…");
+    case TS_DOWNLOADING: return T(L"下载中");
+    case TS_PROCESSING: return T(L"处理中…");
+    case TS_DONE: return T(L"已完成");
+    case TS_FAILED: return T(L"失败");
+    case TS_CANCELED: return T(L"已取消");
     }
     return L"";
 }
@@ -1292,11 +1419,11 @@ static void ShowSelectionInfo() {
     if (sel.size() == 1) {
         std::lock_guard<std::mutex> lk(g_mx);
         auto& t = *sel[0];
-        if (t.st == TS_FAILED && !t.err.empty()) m = L"错误：" + t.err;
+        if (t.st == TS_FAILED && !t.err.empty()) m = T(L"错误：") + t.err;
         else if (!t.filepath.empty()) m = t.filepath;
         else m = t.url;
     } else if (sel.size() > 1) {
-        m = L"已选择 " + std::to_wstring(sel.size()) + L" 项";
+        m = g_en ? std::to_wstring(sel.size()) + L" selected" : L"已选择 " + std::to_wstring(sel.size()) + L" 项";
     }
     SetStatusPart(0, m);
 }
@@ -1320,14 +1447,14 @@ static void OnTimer() {
         else for (int i : dirty) ListView_RedrawItems(g_hList, i, i);
     }
     static std::wstring lastCnt, lastSpd;
-    std::wstring cnt = L"下载中 " + std::to_wstring(active) + L" · 等待 " + std::to_wstring(queued);
-    if (reading) cnt = L"读取列表 " + std::to_wstring(reading) + L" · " + cnt;
+    std::wstring cnt = T(L"下载中 ") + std::to_wstring(active) + T(L" · 等待 ") + std::to_wstring(queued);
+    if (reading) cnt = T(L"读取列表 ") + std::to_wstring(reading) + L" · " + cnt;
     {
         static int lastBusy = -1;
         int busy = reading;           // links already in the list are not shown as parsing
         if (busy != lastBusy) {
             if (busy) {
-                std::wstring b = L"正在解析 " + std::to_wstring(busy) + L" 个链接…";
+                std::wstring b = T(L"正在解析 ") + std::to_wstring(busy) + T(L" 个链接…");
                 SetWindowTextW(g_hBusyTxt, b.c_str());
                 if (lastBusy <= 0) {
                     ShowWindow(g_hBusy, SW_SHOWNA); ShowWindow(g_hBusyTxt, SW_SHOWNA);
@@ -1383,16 +1510,16 @@ static void ShowContextMenu(int x, int y) {
     }
     HMENU m = CreatePopupMenu();
     UINT on = MF_STRING, off = MF_STRING | MF_GRAYED;
-    AppendMenuW(m, (any && hasFile) ? on : off, ID_OPENFILE, L"打开文件\tEnter");
-    AppendMenuW(m, any ? on : off, ID_OPENFOLDER, L"打开所在文件夹");
+    AppendMenuW(m, (any && hasFile) ? on : off, ID_OPENFILE, T(L"打开文件\tEnter"));
+    AppendMenuW(m, any ? on : off, ID_OPENFOLDER, T(L"打开所在文件夹"));
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(m, canRetry ? on : off, ID_RETRY, L"重新下载");
-    AppendMenuW(m, canCancel ? on : off, ID_CANCELTASK, L"取消");
-    AppendMenuW(m, any ? on : off, ID_COPYURL, L"复制链接");
+    AppendMenuW(m, canRetry ? on : off, ID_RETRY, T(L"重新下载"));
+    AppendMenuW(m, canCancel ? on : off, ID_CANCELTASK, T(L"取消"));
+    AppendMenuW(m, any ? on : off, ID_COPYURL, T(L"复制链接"));
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
-    AppendMenuW(m, any ? on : off, ID_REMOVE, L"移除\tDel");
-    AppendMenuW(m, on, ID_CLEARDONE, L"清除已完成");
-    AppendMenuW(m, on, ID_SELALL, L"全选\tCtrl+A");
+    AppendMenuW(m, any ? on : off, ID_REMOVE, T(L"移除\tDel"));
+    AppendMenuW(m, on, ID_CLEARDONE, T(L"清除已完成"));
+    AppendMenuW(m, on, ID_SELALL, T(L"全选\tCtrl+A"));
     TrackPopupMenuEx(m, TPM_RIGHTBUTTON, x, y, g_hwnd, nullptr);
     DestroyMenu(m);
 }
@@ -1402,10 +1529,26 @@ static void ShowContextMenu(int x, int y) {
 // ---------------------------------------------------------------------------
 static const wchar_t* kBrowsers[] = { L"不使用", L"firefox", L"chrome", L"edge", L"brave", L"opera", L"vivaldi", L"chromium" };
 
+static bool g_langChanged = false, g_restart = false;
 static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
     switch (msg) {
     case WM_INITDIALOG: {
         g_hSettingsDlg = d;
+        {
+            wchar_t b[256];
+            GetWindowTextW(d, b, 256); SetWindowTextW(d, T(b));
+            EnumChildWindows(d, [](HWND h, LPARAM) -> BOOL {
+                wchar_t cls[32], t[256];
+                GetClassNameW(h, cls, 32);
+                if (_wcsicmp(cls, L"Edit") && _wcsicmp(cls, L"ComboBox") && GetWindowTextW(h, t, 256) > 0) SetWindowTextW(h, T(t));
+                return TRUE;
+            }, 0);
+            HWND lc = GetDlgItem(d, IDC_LANG);
+            SendMessageW(lc, CB_ADDSTRING, 0, (LPARAM)T(L"跟随系统"));
+            SendMessageW(lc, CB_ADDSTRING, 0, (LPARAM)L"简体中文");
+            SendMessageW(lc, CB_ADDSTRING, 0, (LPARAM)L"English");
+            SendMessageW(lc, CB_SETCURSEL, g_set.lang, 0);
+        }
         HWND c = GetDlgItem(d, IDC_CONC);
         for (int i = 1; i <= 10; ++i) SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)std::to_wstring(i).c_str());
         SendMessageW(c, CB_SETCURSEL, g_set.conc - 1, 0);
@@ -1415,19 +1558,19 @@ static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
         c = GetDlgItem(d, IDC_COOKIES);
         int sel = 0;
         for (int i = 0; i < (int)(sizeof(kBrowsers) / sizeof(*kBrowsers)); ++i) {
-            SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)kBrowsers[i]);
+            SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)T(kBrowsers[i]));
             if (i && g_set.cookies == kBrowsers[i]) sel = i;
         }
         SendMessageW(c, CB_SETCURSEL, sel, 0);
         SetDlgItemTextW(d, IDC_RATE, g_set.rate.c_str());
         SetDlgItemTextW(d, IDC_PROXY, g_set.proxy.c_str());
         SetDlgItemTextW(d, IDC_YTPATH, g_set.ytdlpPath.c_str());
-        SendDlgItemMessageW(d, IDC_RATE, EM_SETCUEBANNER, TRUE, (LPARAM)L"例如 5M，留空不限速");
-        SendDlgItemMessageW(d, IDC_PROXY, EM_SETCUEBANNER, TRUE, (LPARAM)L"例如 http://127.0.0.1:7890");
-        SendDlgItemMessageW(d, IDC_YTPATH, EM_SETCUEBANNER, TRUE, (LPARAM)L"留空自动查找");
+        SendDlgItemMessageW(d, IDC_RATE, EM_SETCUEBANNER, TRUE, (LPARAM)T(L"例如 5M，留空不限速"));
+        SendDlgItemMessageW(d, IDC_PROXY, EM_SETCUEBANNER, TRUE, (LPARAM)T(L"例如 http://127.0.0.1:7890"));
+        SendDlgItemMessageW(d, IDC_YTPATH, EM_SETCUEBANNER, TRUE, (LPARAM)T(L"留空自动查找"));
         CheckDlgButton(d, IDC_SUBS, g_set.subs ? BST_CHECKED : BST_UNCHECKED);
         CheckDlgButton(d, IDC_THUMB, g_set.thumb ? BST_CHECKED : BST_UNCHECKED);
-        SetDlgItemTextW(d, IDC_COMPINFO, g_ffmpeg.empty() ? L"ffmpeg 未安装（合并高清需要）" : L"ffmpeg 已就绪");
+        SetDlgItemTextW(d, IDC_COMPINFO, g_ffmpeg.empty() ? T(L"ffmpeg 未安装（合并高清需要）") : T(L"ffmpeg 已就绪"));
         return TRUE;
     }
     case WM_COMMAND:
@@ -1442,11 +1585,11 @@ static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
         }
         case IDC_UPDATE:
             StartComponent(ID_UPDATE_YTDLP);
-            SetDlgItemTextW(d, IDC_COMPINFO, L"进度见主窗口状态栏");
+            SetDlgItemTextW(d, IDC_COMPINFO, T(L"进度见主窗口状态栏"));
             return TRUE;
         case IDC_GETFF:
             StartComponent(ID_GET_FFMPEG);
-            SetDlgItemTextW(d, IDC_COMPINFO, L"约 200 MB，进度见状态栏");
+            SetDlgItemTextW(d, IDC_COMPINFO, T(L"约 200 MB，进度见状态栏"));
             return TRUE;
         case IDOK: {
             g_set.conc = (int)SendDlgItemMessageW(d, IDC_CONC, CB_GETCURSEL, 0, 0) + 1;
@@ -1459,6 +1602,10 @@ static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
             GetDlgItemTextW(d, IDC_YTPATH, b, 2048); g_set.ytdlpPath = Trim(b);
             g_set.subs = IsDlgButtonChecked(d, IDC_SUBS) == BST_CHECKED;
             g_set.thumb = IsDlgButtonChecked(d, IDC_THUMB) == BST_CHECKED;
+            {
+                int lg = (int)SendDlgItemMessageW(d, IDC_LANG, CB_GETCURSEL, 0, 0);
+                if (lg >= 0 && lg != g_set.lang) { g_set.lang = lg; g_langChanged = true; }
+            }
             SaveSettings();
             EndDialog(d, IDOK);
             return TRUE;
@@ -1495,14 +1642,14 @@ static LRESULT CALLBACK EditMenuProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, UIN
         bool clip = IsClipboardFormatAvailable(CF_UNICODETEXT) != 0;
         HMENU m = CreatePopupMenu();
         auto on = [](bool e) { return MF_STRING | (e ? 0u : (UINT)MF_GRAYED); };
-        AppendMenuW(m, on(!ro && SendMessageW(h, EM_CANUNDO, 0, 0)), 1, L"撤销");
+        AppendMenuW(m, on(!ro && SendMessageW(h, EM_CANUNDO, 0, 0)), 1, T(L"撤销"));
         AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
-        AppendMenuW(m, on(sel && !ro), 2, L"剪切");
-        AppendMenuW(m, on(sel), 3, L"复制");
-        AppendMenuW(m, on(clip && !ro), 4, L"粘贴");
-        AppendMenuW(m, on(sel && !ro), 5, L"删除");
+        AppendMenuW(m, on(sel && !ro), 2, T(L"剪切"));
+        AppendMenuW(m, on(sel), 3, T(L"复制"));
+        AppendMenuW(m, on(clip && !ro), 4, T(L"粘贴"));
+        AppendMenuW(m, on(sel && !ro), 5, T(L"删除"));
         AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
-        AppendMenuW(m, on(any), 6, L"全选");
+        AppendMenuW(m, on(any), 6, T(L"全选"));
         int x = GET_X_LPARAM(lp), y = GET_Y_LPARAM(lp);
         if (x == -1 && y == -1) { RECT r; GetWindowRect(h, &r); x = r.left + S(8); y = r.top + S(8); }
         int c = TrackPopupMenu(m, TPM_RETURNCMD | TPM_RIGHTBUTTON, x, y, 0, h, nullptr);
@@ -1525,17 +1672,17 @@ static void OnCreate(HWND hwnd) {
     g_dpi = GetDpiForWindow(hwnd);
     CreateUiFont();
 
-    g_hUrlLbl  = MakeCtl(WC_STATICW, L"视频链接（支持一次粘贴多个，按 Enter 添加）", SS_LEFT | SS_NOPREFIX, IDC_URLLBL);
+    g_hUrlLbl  = MakeCtl(WC_STATICW, T(L"视频链接（支持一次粘贴多个，按 Enter 添加）"), SS_LEFT | SS_NOPREFIX, IDC_URLLBL);
     g_hUrl     = MakeCtl(WC_EDITW, L"", WS_TABSTOP | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL, IDC_URL, WS_EX_CLIENTEDGE);
-    g_hAdd     = MakeCtl(WC_BUTTONW, L"解析并添加下载", WS_TABSTOP | BS_DEFPUSHBUTTON, IDC_ADD);
-    g_hFmtLbl  = MakeCtl(WC_STATICW, L"格式", SS_LEFT, IDC_FMTLBL);
+    g_hAdd     = MakeCtl(WC_BUTTONW, T(L"解析并添加下载"), WS_TABSTOP | BS_DEFPUSHBUTTON, IDC_ADD);
+    g_hFmtLbl  = MakeCtl(WC_STATICW, T(L"格式"), SS_LEFT, IDC_FMTLBL);
     g_hFmt     = MakeCtl(WC_COMBOBOXW, L"", WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST, IDC_FMT);
-    g_hDirLbl  = MakeCtl(WC_STATICW, L"保存到", SS_LEFT, IDC_DIRLBL);
+    g_hDirLbl  = MakeCtl(WC_STATICW, T(L"保存到"), SS_LEFT, IDC_DIRLBL);
     g_hDir     = MakeCtl(WC_EDITW, g_set.outDir.c_str(), WS_TABSTOP | ES_AUTOHSCROLL, IDC_DIR, WS_EX_CLIENTEDGE);
-    g_hBrowse  = MakeCtl(WC_BUTTONW, L"浏览…", WS_TABSTOP | BS_PUSHBUTTON, IDC_BROWSE);
-    g_hPlaylist= MakeCtl(WC_BUTTONW, L"下载整个播放列表", WS_TABSTOP | BS_AUTOCHECKBOX, IDC_PLAYLIST);
-    g_hOpenDir = MakeCtl(WC_BUTTONW, L"打开文件夹", WS_TABSTOP | BS_PUSHBUTTON, IDC_OPENDIR);
-    g_hSettings= MakeCtl(WC_BUTTONW, L"设置…", WS_TABSTOP | BS_PUSHBUTTON, IDC_SETTINGS);
+    g_hBrowse  = MakeCtl(WC_BUTTONW, T(L"浏览…"), WS_TABSTOP | BS_PUSHBUTTON, IDC_BROWSE);
+    g_hPlaylist= MakeCtl(WC_BUTTONW, T(L"下载整个播放列表"), WS_TABSTOP | BS_AUTOCHECKBOX, IDC_PLAYLIST);
+    g_hOpenDir = MakeCtl(WC_BUTTONW, T(L"打开文件夹"), WS_TABSTOP | BS_PUSHBUTTON, IDC_OPENDIR);
+    g_hSettings= MakeCtl(WC_BUTTONW, T(L"设置…"), WS_TABSTOP | BS_PUSHBUTTON, IDC_SETTINGS);
     g_hList    = MakeCtl(WC_LISTVIEWW, L"", WS_TABSTOP | LVS_REPORT | LVS_OWNERDATA | LVS_SHOWSELALWAYS, IDC_LIST, WS_EX_CLIENTEDGE);
     g_hStatus  = MakeCtl(STATUSCLASSNAMEW, L"", SBARS_SIZEGRIP, IDC_STATUS);
     // "parsing" indicator: visible while links are read, so every click gets feedback
@@ -1545,17 +1692,17 @@ static void OnCreate(HWND hwnd) {
 
     SetWindowSubclass(g_hUrl, EditMenuProc, 1, 0);
     SetWindowSubclass(g_hDir, EditMenuProc, 1, 0);
-    for (int i = 0; i < kFormatCount; ++i) SendMessageW(g_hFmt, CB_ADDSTRING, 0, (LPARAM)g_formats[i].name);
+    for (int i = 0; i < kFormatCount; ++i) SendMessageW(g_hFmt, CB_ADDSTRING, 0, (LPARAM)T(g_formats[i].name));
     SendMessageW(g_hFmt, CB_SETCURSEL, (g_set.fmt >= 0 && g_set.fmt < kFormatCount) ? g_set.fmt : 0, 0);
     Button_SetCheck(g_hPlaylist, g_set.playlist ? BST_CHECKED : BST_UNCHECKED);
-    SendMessageW(g_hDir, EM_SETCUEBANNER, TRUE, (LPARAM)L"选择保存目录");
+    SendMessageW(g_hDir, EM_SETCUEBANNER, TRUE, (LPARAM)T(L"选择保存目录"));
 
     SetWindowTheme(g_hList, L"Explorer", nullptr);
     ListView_SetExtendedListViewStyle(g_hList, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP | LVS_EX_HEADERDRAGDROP);
     for (int i = 0; i < kCols; ++i) {
         LVCOLUMNW c{}; c.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT;
         c.fmt = (i >= 3 && i <= 5) ? LVCFMT_RIGHT : LVCFMT_LEFT;
-        c.cx = S(kColW[i]); c.pszText = (LPWSTR)kColName[i];
+        c.cx = S(kColW[i]); c.pszText = (LPWSTR)T(kColName[i]);
         ListView_InsertColumn(g_hList, i, &c);
     }
     UpdateRowHeight();
@@ -1565,10 +1712,10 @@ static void OnCreate(HWND hwnd) {
     Layout();
     DetectTools();
     UpdateToolStatus();
-    SetStatusPart(0, L"就绪");
+    SetStatusPart(0, T(L"就绪"));
     LoadTasks();
     RefreshListCount();
-    { int n = TaskCount(); if (n) { g_statusMsg = L"已恢复 " + std::to_wstring(n) + L" 个任务"; SetStatusPart(0, g_statusMsg); } }
+    { int n = TaskCount(); if (n) { g_statusMsg = T(L"已恢复 ") + std::to_wstring(n) + T(L" 个任务"); SetStatusPart(0, g_statusMsg); } }
     Pump();
     SetTimer(hwnd, 1, 250, nullptr);
     SetFocus(g_hUrl);
@@ -1621,8 +1768,16 @@ static void OnCommand(HWND hwnd, int id, int code) {
         break;
     }
     case IDC_SETTINGS:
+        g_langChanged = false;
         if (DialogBoxParamW(g_hInst, MAKEINTRESOURCEW(IDD_SETTINGS), hwnd, SettingsProc, 0) == IDOK) {
             DetectTools(); UpdateToolStatus(); Pump();
+            if (g_langChanged &&
+                MessageBoxW(hwnd, L"界面语言将在重启后生效，现在重启 YtGrab 吗？（未完成的下载会自动继续）\n\n"
+                                  L"The new language applies after a restart. Restart YtGrab now? (Unfinished downloads resume.)",
+                            L"YtGrab", MB_YESNO | MB_ICONQUESTION) == IDYES) {
+                g_restart = true;
+                PostMessageW(hwnd, WM_CLOSE, 0, 0);
+            }
         }
         break;
     case IDC_FMT:
@@ -1706,7 +1861,7 @@ static LRESULT OnNotify(NMHDR* nh) {
     case LVN_GETEMPTYMARKUP: {
         auto* em = (NMLVEMPTYMARKUP*)nh;
         em->dwFlags = EMF_CENTERED;
-        lstrcpynW(em->szMarkup, L"还没有下载任务。复制视频链接后点击“粘贴并下载”，或在列表中按 Ctrl+V。", L_MAX_URL_LENGTH);
+        lstrcpynW(em->szMarkup, T(L"还没有下载任务。粘贴视频链接后点击「解析并添加下载」，或在列表中按 Ctrl+V。"), L_MAX_URL_LENGTH);
         return TRUE;
     }
     }
@@ -1720,8 +1875,8 @@ static bool ConfirmClose() {
         for (auto& t : g_tasks) if (IsActive(t->st)) ++active;
     }
     if (!active) return true;
-    std::wstring m = L"还有 " + std::to_wstring(active) + L" 个任务正在下载，退出将暂停它们，下次打开会自动继续。确定退出吗？";
-    return MessageBoxW(g_hwnd, m.c_str(), kAppName, MB_OKCANCEL | MB_ICONWARNING | MB_DEFBUTTON2) == IDOK;
+    std::wstring m = std::wstring(T(L"还有 ")) + std::to_wstring(active) + T(L" 个任务正在下载，退出将暂停它们，下次打开会自动继续。确定退出吗？");
+    return MessageBoxW(g_hwnd, m.c_str(), T(kAppName), MB_OKCANCEL | MB_ICONWARNING | MB_DEFBUTTON2) == IDOK;
 }
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -1770,12 +1925,12 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         if ((HWND)wp == g_hList) { ShowContextMenu(GET_X_LPARAM(lp), GET_Y_LPARAM(lp)); return 0; }
         break;
     case WM_TIMER:
-        if (wp == 2) { KillTimer(hwnd, 2); SetWindowTextW(g_hAdd, L"解析并添加下载"); return 0; }
+        if (wp == 2) { KillTimer(hwnd, 2); SetWindowTextW(g_hAdd, T(L"解析并添加下载")); return 0; }
         OnTimer();
         return 0;
     case WM_APP_EXPANDED:
         RefreshListCount();
-        if (lp > 1) { g_statusMsg = L"列表已展开为 " + std::to_wstring((int)lp) + L" 个下载任务"; SetStatusPart(0, g_statusMsg); }
+        if (lp > 1) { g_statusMsg = T(L"列表已展开为 ") + std::to_wstring((int)lp) + T(L" 个下载任务"); SetStatusPart(0, g_statusMsg); }
         if (lp > 0) { int n = TaskCount(); ListView_EnsureVisible(g_hList, n - 1, FALSE); }
         Pump();
         OnTimer();
@@ -1801,14 +1956,14 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             DetectTools();
             UpdateToolStatus();
             if (g_hSettingsDlg)
-                SetDlgItemTextW(g_hSettingsDlg, IDC_COMPINFO, wp == 1 ? L"完成" : L"失败，详见状态栏");
-            if (wp == 2) MessageBoxW(g_hSettingsDlg ? g_hSettingsDlg : hwnd, m->c_str(), kAppName, MB_OK | MB_ICONWARNING);
+                SetDlgItemTextW(g_hSettingsDlg, IDC_COMPINFO, wp == 1 ? T(L"完成") : T(L"失败，详见状态栏"));
+            if (wp == 2) MessageBoxW(g_hSettingsDlg ? g_hSettingsDlg : hwnd, m->c_str(), T(kAppName), MB_OK | MB_ICONWARNING);
             Pump();
         }
         return 0;
     }
     case WM_CLOSE:
-        if (!ConfirmClose()) return 0;
+        if (!g_restart && !ConfirmClose()) return 0;
         CommitUiAndSave();
         SaveTasks();                       // unfinished downloads continue next time
         {
@@ -1876,7 +2031,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nShow) {
     int x = g_set.w > 0 ? g_set.x : CW_USEDEFAULT;
     int y = g_set.w > 0 ? g_set.y : CW_USEDEFAULT;
 
-    HWND hwnd = CreateWindowExW(0, kClass, kAppName, WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
+    HWND hwnd = CreateWindowExW(0, kClass, T(kAppName), WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                                 x, y, w, h, nullptr, nullptr, hInst, nullptr);
     if (!hwnd) return 1;
     ShowWindow(hwnd, g_set.maximized ? SW_SHOWMAXIMIZED : nShow);
@@ -1896,6 +2051,14 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nShow) {
         if (IsDialogMessageW(hwnd, &m)) continue;
         TranslateMessage(&m);
         DispatchMessageW(&m);
+    }
+    if (g_restart) {
+        if (mtx) { ReleaseMutex(mtx); CloseHandle(mtx); }
+        wchar_t exe[MAX_PATH]; GetModuleFileNameW(nullptr, exe, MAX_PATH);
+        STARTUPINFOW si{ sizeof(si) }; PROCESS_INFORMATION pi{};
+        if (CreateProcessW(exe, nullptr, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
+            CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
+        }
     }
     // Detached workers may still be unwinding; skip CRT static destructors.
     ExitProcess(0);
