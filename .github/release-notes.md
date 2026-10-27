@@ -1,5 +1,7 @@
 ## What's new / 更新内容
 
+- **English interface.** Settings now has "Language: System default / 简体中文 / English". Changing it offers an instant restart; unfinished downloads resume automatically.
+  **新增英文界面。** 设置里可选「界面语言：跟随系统 / 简体中文 / English」，切换后可一键重启生效，未完成的下载会自动继续。
 - **Simpler input row.** "Parse & add" now sits right before "Download whole playlist"; "Paste & download" was removed. Only playlist/channel links that are still being read show "Parsing…"; rows already in the list just show "Preparing".
   **输入区更简洁。**「解析并添加下载」移到「下载整个播放列表」前面，删除「粘贴并下载」；只有还在读取的播放列表/频道显示「正在解析」，已进入下载列表的任务显示「准备中」。
 - **Cleaner right-click menu in the text boxes:** Undo, Cut, Copy, Paste, Delete, Select all, without the reading-order / Unicode / IME entries.
