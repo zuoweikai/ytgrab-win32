@@ -46,7 +46,7 @@ enum {
     IDC_URLLBL = 200, IDC_URL, IDC_PASTE, IDC_FMTLBL, IDC_FMT, IDC_DIRLBL, IDC_DIR,
     IDC_BROWSE, IDC_STARTALL, IDC_STOPALL, IDC_SETTINGS, IDC_OPENDIR, IDC_LIST, IDC_STATUS, IDC_BUSY, IDC_BUSYTXT,
     ID_OPENFILE = 300, ID_OPENFOLDER, ID_COPYURL, ID_RETRY, ID_CANCELTASK, ID_REMOVE,
-    ID_CLEARDONE, ID_SELALL, ID_UPDATE_YTDLP, ID_GET_FFMPEG, ID_GET_YTDLP
+    ID_CLEARDONE, ID_SELALL, ID_DELFILE, ID_UPDATE_YTDLP, ID_GET_FFMPEG, ID_GET_YTDLP
 };
 #define IDC_ADD IDOK
 
@@ -154,7 +154,12 @@ static const TrPair EN_TABLE[] = {
     { L"删除", L"Delete" },
     { L"全选", L"Select all" },
     { L"视频链接（支持一次粘贴多个，按 Enter 添加）", L"Video links (paste several at once, press Enter to add)" },
-    { L"解析并添加下载", L"Parse && add" },
+    { L"解析并下载", L"Parse && download" },
+    { L"从硬盘删除文件", L"Delete file from disk" },
+    { L"确定从硬盘删除选中任务的 ", L"Delete " },
+    { L" 个文件吗？\n文件会移到回收站，这些任务也会从列表中移除。", L" file(s) of the selected tasks from disk?\nThey go to the Recycle Bin, and the tasks are removed from the list." },
+    { L"已删除 ", L"Deleted " },
+    { L" 个文件", L" file(s)" },
     { L"格式", L"Format" },
     { L"保存到", L"Save to" },
     { L"浏览…", L"Browse…" },
@@ -165,7 +170,7 @@ static const TrPair EN_TABLE[] = {
     { L"就绪", L"Ready" },
     { L"已恢复 ", L"Restored " },
     { L" 个任务", L" task(s)" },
-    { L"还没有下载任务。粘贴视频链接后点击「解析并添加下载」，或在列表中按 Ctrl+V。", L"No downloads yet. Paste video links and click \"Parse & add\", or press Ctrl+V in the list." },
+    { L"还没有下载任务。粘贴视频链接后点击「解析并下载」，或在列表中按 Ctrl+V。", L"No downloads yet. Paste video links and click \"Parse & download\", or press Ctrl+V in the list." },
     { L"还有 ", L"" },
     { L" 个任务正在下载，退出将暂停它们，下次打开后点「开始全部」继续。确定退出吗？", L" download(s) still running. Quitting pauses them; click \"Start all\" next time to resume. Quit now?" },
     { L"列表已展开为 ", L"List expanded into " },
@@ -1605,6 +1610,7 @@ static void ShowContextMenu(int x, int y) {
     AppendMenuW(m, any ? on : off, ID_COPYURL, T(L"复制链接"));
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(m, any ? on : off, ID_REMOVE, T(L"移除\tDel"));
+    AppendMenuW(m, (any && hasFile) ? on : off, ID_DELFILE, T(L"从硬盘删除文件"));
     AppendMenuW(m, on, ID_CLEARDONE, T(L"清除已完成"));
     AppendMenuW(m, on, ID_SELALL, T(L"全选\tCtrl+A"));
     TrackPopupMenuEx(m, TPM_RIGHTBUTTON, x, y, g_hwnd, nullptr);
@@ -1761,7 +1767,7 @@ static void OnCreate(HWND hwnd) {
 
     g_hUrlLbl  = MakeCtl(WC_STATICW, T(L"视频链接（支持一次粘贴多个，按 Enter 添加）"), SS_LEFT | SS_NOPREFIX, IDC_URLLBL);
     g_hUrl     = MakeCtl(WC_EDITW, L"", WS_TABSTOP | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL, IDC_URL, WS_EX_CLIENTEDGE);
-    g_hAdd     = MakeCtl(WC_BUTTONW, T(L"解析并添加下载"), WS_TABSTOP | BS_DEFPUSHBUTTON, IDC_ADD);
+    g_hAdd     = MakeCtl(WC_BUTTONW, T(L"解析并下载"), WS_TABSTOP | BS_DEFPUSHBUTTON, IDC_ADD);
     g_hFmtLbl  = MakeCtl(WC_STATICW, T(L"格式"), SS_LEFT, IDC_FMTLBL);
     g_hFmt     = MakeCtl(WC_COMBOBOXW, L"", WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST, IDC_FMT);
     g_hDirLbl  = MakeCtl(WC_STATICW, T(L"保存到"), SS_LEFT, IDC_DIRLBL);
@@ -1900,6 +1906,36 @@ static void OnCommand(HWND hwnd, int id, int code) {
     case ID_REMOVE:
         RemoveTasks(SelectedTasks());
         break;
+    case ID_DELFILE: {
+        // Files of the selected tasks (and any leftover .part) go to the Recycle Bin; the tasks leave the list.
+        auto sel = SelectedTasks();
+        std::vector<std::wstring> files;
+        for (auto& t : sel) {
+            std::wstring fp;
+            { std::lock_guard<std::mutex> lk(g_mx); fp = t->filepath; }
+            if (fp.empty()) continue;
+            if (FileExists(fp)) files.push_back(fp);
+            if (FileExists(fp + L".part")) files.push_back(fp + L".part");
+        }
+        if (files.empty()) break;
+        int n = 0;
+        for (auto& f : files) if (f.size() < 5 || f.compare(f.size() - 5, 5, L".part") != 0) ++n;
+        if (!n) n = (int)files.size();
+        std::wstring q = T(L"确定从硬盘删除选中任务的 ") + std::to_wstring(n) + T(L" 个文件吗？\n文件会移到回收站，这些任务也会从列表中移除。");
+        if (MessageBoxW(hwnd, q.c_str(), T(L"YtGrab 视频下载器"), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES) break;
+        RemoveTasks(sel);           // stops any that are still running
+        Sleep(300);                 // let a stopped yt-dlp release its file
+        std::wstring list;
+        for (auto& f : files) { list += f; list.push_back(L'\0'); }
+        list.push_back(L'\0');
+        SHFILEOPSTRUCTW op{};
+        op.hwnd = hwnd; op.wFunc = FO_DELETE; op.pFrom = list.c_str();
+        op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI;
+        SHFileOperationW(&op);
+        g_statusMsg = T(L"已删除 ") + std::to_wstring(n) + T(L" 个文件");
+        SetStatusPart(0, g_statusMsg);
+        break;
+    }
     case ID_CLEARDONE: {
         std::vector<std::shared_ptr<Task>> done;
         {
@@ -1949,7 +1985,7 @@ static LRESULT OnNotify(NMHDR* nh) {
     case LVN_GETEMPTYMARKUP: {
         auto* em = (NMLVEMPTYMARKUP*)nh;
         em->dwFlags = EMF_CENTERED;
-        lstrcpynW(em->szMarkup, T(L"还没有下载任务。粘贴视频链接后点击「解析并添加下载」，或在列表中按 Ctrl+V。"), L_MAX_URL_LENGTH);
+        lstrcpynW(em->szMarkup, T(L"还没有下载任务。粘贴视频链接后点击「解析并下载」，或在列表中按 Ctrl+V。"), L_MAX_URL_LENGTH);
         return TRUE;
     }
     }
@@ -2013,7 +2049,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         if ((HWND)wp == g_hList) { ShowContextMenu(GET_X_LPARAM(lp), GET_Y_LPARAM(lp)); return 0; }
         break;
     case WM_TIMER:
-        if (wp == 2) { KillTimer(hwnd, 2); SetWindowTextW(g_hAdd, T(L"解析并添加下载")); return 0; }
+        if (wp == 2) { KillTimer(hwnd, 2); SetWindowTextW(g_hAdd, T(L"解析并下载")); return 0; }
         OnTimer();
         return 0;
     case WM_APP_EXPANDED:
