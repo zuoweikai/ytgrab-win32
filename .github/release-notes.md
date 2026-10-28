@@ -1,8 +1,10 @@
 ## What's new / 更新内容
 
+- **"Parse & download"** is the new name of the add button. The task menu gains **Delete file from disk** (to the Recycle Bin, after a confirmation).
+  按钮改名为「解析并下载」；任务右键菜单新增「从硬盘删除文件」（确认后移到回收站）。
 - **Playlist prompt.** The "Whole playlist" checkbox is gone. A video link that sits inside a playlist now asks: only this video, or the whole playlist. Playlist and channel links still expand into one task per video.
   **播放列表弹窗询问。** 去掉「下载整个播放列表」复选框；粘贴的视频链接属于播放列表时，弹窗询问只下载当前视频还是整个列表。
-- **Start all / Stop all** buttons after "Parse & add". Stop pauses running and queued tasks; Start resumes paused, failed and canceled ones.
+- **Start all / Stop all** buttons after "Parse & download". Stop pauses running and queued tasks; Start resumes paused, failed and canceled ones.
   **新增「开始全部」「停止全部」按钮。**
 - **No auto-start on launch.** Restored unfinished tasks show as Paused until you click Start all.
   **打开软件不再自动开始下载**，恢复的未完成任务显示为「已暂停」。
