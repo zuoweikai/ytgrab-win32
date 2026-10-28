@@ -12,7 +12,7 @@ mkdir -p "$(dirname "$OUT")"
 $WINDRES --codepage=65001 -O coff app.rc -o app.res.o
 $CXX -std=c++17 -O2 -DNDEBUG -municode -mwindows -static -s \
   -ffunction-sections -fdata-sections -Wl,--gc-sections \
-  main.cpp app.res.o -o "$OUT" \
+  -Iwv2 main.cpp app.res.o -o "$OUT" \
   -lcomctl32 -luxtheme -lshell32 -lshlwapi -lole32 -luuid -lurlmon -lwininet -ldwmapi -lcomdlg32 -lgdi32
 rm -f app.res.o
 echo "built $OUT"

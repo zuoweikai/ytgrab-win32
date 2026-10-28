@@ -30,6 +30,9 @@ jobs:
           mkdir -p "$HOME/llvm-mingw" && tar -xf llvm-mingw.tar.xz -C "$HOME/llvm-mingw" --strip-components=1
           echo "$HOME/llvm-mingw/bin" >> "$GITHUB_PATH"
 
+      - name: WebView2 SDK (header + WebView2Loader.dll)
+        run: bash scripts/fetch-webview2.sh ${{ matrix.arch }} dist/YtGrab-win-${{ matrix.arch }}/tools
+
       - name: Build
         run: |
           if [ "${{ matrix.arch }}" = "arm64" ]; then

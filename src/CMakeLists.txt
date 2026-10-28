@@ -3,6 +3,7 @@ project(YtGrab CXX RC)
 set(CMAKE_CXX_STANDARD 17)
 add_executable(YtGrab WIN32 main.cpp app.rc)
 target_compile_definitions(YtGrab PRIVATE UNICODE _UNICODE)
+target_include_directories(YtGrab PRIVATE wv2)   # scripts/fetch-webview2.sh puts WebView2.h here
 if(MSVC)
   # Static CRT: no VC++ redistributable needed on the target machine.
   set_property(TARGET YtGrab PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")

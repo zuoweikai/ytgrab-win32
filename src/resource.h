@@ -14,3 +14,4 @@
 #define IDC_GETFF       1011
 #define IDC_COMPINFO    1012
 #define IDC_LANG        1013
+#define IDR_XHSJS       200

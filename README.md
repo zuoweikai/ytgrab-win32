@@ -30,6 +30,7 @@ Settings are stored in `%APPDATA%\YtGrab\settings.ini`; put an empty `settings.i
 - Parallel queue (1–10 tasks), each with 1–16 fragment threads (`-N`)
 - Presets: Best / 4K / 2K / 1080p / 720p / 480p / MP4 (H.264) / MP3 / M4A / original audio
 - Playlists, subtitles (Chinese / English), embedded thumbnails, speed limit, proxy, browser cookies
+- Built-in browser (WebView2): sign in to any site inside the app and downloads use that sign-in; Xiaohongshu profiles can be grabbed in full (videos and image notes)
 - Live progress with themed progress bars, speed, ETA, taskbar progress, and a taskbar flash when done
 - Right-click: open file, show in folder, retry, cancel, copy link, remove, clear completed
 - Every download runs in its own Job Object, so cancelling or quitting also stops ffmpeg

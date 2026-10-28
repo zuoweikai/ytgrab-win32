@@ -5,6 +5,7 @@
 
 IDI_APP ICON "app.ico"
 1 RT_MANIFEST "app.manifest"
+IDR_XHSJS RCDATA "xhs.js"
 
 IDD_SETTINGS DIALOGEX 0, 0, 300, 250
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
@@ -24,8 +25,8 @@ BEGIN
     GROUPBOX        "网络", -1, 7, 106, 286, 52
     LTEXT           "代理：", -1, 15, 122, 90, 9
     EDITTEXT        IDC_PROXY, 110, 120, 175, 13, ES_AUTOHSCROLL
-    LTEXT           "使用浏览器 Cookies：", -1, 15, 141, 90, 9
-    COMBOBOX        IDC_COOKIES, 110, 139, 80, 160, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Cookies 来源：", -1, 15, 141, 90, 9
+    COMBOBOX        IDC_COOKIES, 110, 139, 130, 160, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
     GROUPBOX        "组件", -1, 7, 163, 286, 62
     LTEXT           "yt-dlp 路径：", -1, 15, 179, 90, 9

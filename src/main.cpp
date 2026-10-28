@@ -44,9 +44,9 @@
 // ---------------------------------------------------------------------------
 enum {
     IDC_URLLBL = 200, IDC_URL, IDC_PASTE, IDC_FMTLBL, IDC_FMT, IDC_DIRLBL, IDC_DIR,
-    IDC_BROWSE, IDC_STARTALL, IDC_STOPALL, IDC_SETTINGS, IDC_OPENDIR, IDC_LIST, IDC_STATUS, IDC_BUSY, IDC_BUSYTXT,
+    IDC_BROWSE, IDC_STARTALL, IDC_STOPALL, IDC_SETTINGS, IDC_OPENDIR, IDC_LOGIN, IDC_LIST, IDC_STATUS, IDC_BUSY, IDC_BUSYTXT,
     ID_OPENFILE = 300, ID_OPENFOLDER, ID_COPYURL, ID_RETRY, ID_CANCELTASK, ID_REMOVE,
-    ID_CLEARDONE, ID_SELALL, ID_DELFILE, ID_UPDATE_YTDLP, ID_GET_FFMPEG, ID_GET_YTDLP
+    ID_CLEARDONE, ID_SELALL, ID_DELFILE, ID_UPDATE_YTDLP, ID_GET_FFMPEG, ID_GET_YTDLP, ID_LOGINSITE
 };
 #define IDC_ADD IDOK
 
@@ -193,7 +193,44 @@ static const TrPair EN_TABLE[] = {
     { L"下载 ffmpeg", L"Get ffmpeg" },
     { L"确定", L"OK" },
     { L"界面语言：", L"Language:" },
-    { L"跟随系统", L"System default" }
+    { L"跟随系统", L"System default" },
+    { L"登录网站…", L"Sign in…" },
+    { L"在内置浏览器中登录", L"Sign in with built-in browser" },
+    { L"内置浏览器（推荐）", L"Built-in browser (recommended)" },
+    { L"Cookies 来源：", L"Cookies from:" },
+    { L"YtGrab 内置浏览器", L"YtGrab built-in browser" },
+    { L"前往", L"Go" },
+    { L"抓取本页全部", L"Grab this page" },
+    { L"停止抓取", L"Stop grabbing" },
+    { L"已停止", L"Stopped" },
+    { L"正在启动内置浏览器…", L"Starting the built-in browser…" },
+    { L"输入要登录的网站，例如 youtube.com，按 Enter", L"Type a site to sign in to, e.g. youtube.com, then Enter" },
+    { L"在这里登录网站后，下载时会自动使用登录状态（设置里 Cookies 选「内置浏览器」）", L"Sign in to sites here; downloads then use that sign-in (Settings: Cookies from built-in browser)" },
+    { L"目前只能抓取小红书主页或笔记；其他网站登录后直接在主窗口粘贴链接即可", L"Grabbing works on Xiaohongshu profiles and notes; for other sites just sign in, then paste links in the main window" },
+    { L"正在打开：", L"Opening: " },
+    { L"正在打开主页…", L"Opening the profile…" },
+    { L"请先在这个窗口登录小红书，登录后会自动继续", L"Please sign in to Xiaohongshu in this window; grabbing continues automatically" },
+    { L"小红书要求验证，暂停 60 秒后重试…", L"Xiaohongshu asked for verification; waiting 60 s before retrying…" },
+    { L"正在浏览主页，已找到 ", L"Browsing the profile, found " },
+    { L" 条笔记", L" notes" },
+    { L"正在读取笔记 ", L"Reading note " },
+    { L"，已加入下载 ", L", queued " },
+    { L"这个页面不是小红书主页或笔记", L"This page is not a Xiaohongshu profile or note" },
+    { L"出错：", L"Error: " },
+    { L"共 ", L"" },
+    { L" 条笔记，开始逐条读取…", L" notes found, reading them one by one…" },
+    { L"完成，本次加入下载 ", L"Done, queued " },
+    { L" 条", L"" },
+    { L"小红书：已加入 ", L"Xiaohongshu: queued " },
+    { L"小红书链接已交给内置浏览器抓取", L"Xiaohongshu link handed to the built-in browser" },
+    { L"需要登录：右键选「在内置浏览器中登录」，登录后重新下载。 ", L"Sign-in needed: right-click > Sign in with built-in browser, then retry. " },
+    { L"无法连接：", L"Cannot connect: " },
+    { L"无法写入文件：", L"Cannot write file: " },
+    { L"下载中断", L"Download interrupted" },
+    { L"下载不完整", L"Incomplete download" },
+    { L"找不到 WebView2Loader.dll（应在 tools 文件夹中）", L"WebView2Loader.dll not found (it belongs in the tools folder)" },
+    { L"无法启动内置浏览器", L"Could not start the built-in browser" },
+    { L"\n\n内置浏览器需要 Microsoft Edge WebView2 运行时（Windows 10/11 通常已自带）。现在打开下载页面吗？", L"\n\nThe built-in browser needs the Microsoft Edge WebView2 Runtime (included with most Windows 10/11 PCs). Open the download page now?" }
 };
 static const wchar_t* T(const wchar_t* zh) {
     if (!g_en || !zh) return zh;
@@ -334,7 +371,7 @@ static void LoadSettings() {
     g_set.outDir   = IniStr(L"OutDir");
     if (g_set.outDir.empty()) g_set.outDir = KnownFolder(FOLDERID_Downloads);
     g_set.proxy    = IniStr(L"Proxy");
-    g_set.cookies  = IniStr(L"Cookies");
+    g_set.cookies  = IniStr(L"Cookies", L"builtin");
     g_set.rate     = IniStr(L"RateLimit");
     g_set.ytdlpPath= IniStr(L"YtdlpPath");
     g_set.fmt      = IniInt(L"Format", 0);
@@ -397,6 +434,9 @@ struct Task {
     int plIdx = 0, plCount = 0;
     bool pause = false;       // stopped by "停止全部": ends as paused, not canceled
     bool expand = false;      // playlist/channel link: list its videos as separate tasks first
+    std::wstring mediaId;     // Xiaohongshu note collected by the built-in browser: direct media links
+    std::vector<std::wstring> media;
+    std::wstring ckTmp;       // per-run copy of the built-in browser's cookies
     HANDLE job = nullptr;
     bool cancel = false;
     bool dirty = true;
@@ -407,13 +447,15 @@ static std::mutex g_mx;
 static int g_nextId = 1;
 
 static bool IsActive(TaskState s) { return s == TS_STARTING || s == TS_DOWNLOADING || s == TS_PROCESSING; }
+static void DirectWorker(std::shared_ptr<Task> t, HWND hwnd);
+static std::wstring CookieArgs(std::wstring* tmpOut);
 
 // ---------------------------------------------------------------------------
 // Globals: UI
 // ---------------------------------------------------------------------------
 static HINSTANCE g_hInst;
 static HWND g_hwnd, g_hUrlLbl, g_hUrl, g_hAdd, g_hFmtLbl, g_hFmt, g_hDirLbl, g_hDir, g_hBrowse,
-            g_hStartAll, g_hStopAll, g_hSettings, g_hOpenDir, g_hList, g_hStatus, g_hBusy, g_hBusyTxt;
+            g_hStartAll, g_hStopAll, g_hSettings, g_hOpenDir, g_hLogin, g_hList, g_hStatus, g_hBusy, g_hBusyTxt;
 static HWND g_hSettingsDlg;
 static HFONT g_font;
 static UINT g_dpi = 96;
@@ -565,7 +607,7 @@ static void DetectTools() {
 // ---------------------------------------------------------------------------
 // Download worker
 // ---------------------------------------------------------------------------
-static std::wstring BuildArgs(const Task& t) {
+static std::wstring BuildArgs(Task& t) {
     bool ff = !g_ffmpeg.empty();
     std::wstring a;
     a += L"--newline --progress --no-simulate --no-colors --encoding utf-8 --no-mtime --windows-filenames";
@@ -583,7 +625,7 @@ static std::wstring BuildArgs(const Task& t) {
     a += L" -N " + std::to_wstring(g_set.frag);
     if (ff) a += L" --ffmpeg-location " + Q(DirOf(g_ffmpeg));
     if (!g_set.proxy.empty())   a += L" --proxy " + Q(g_set.proxy);
-    if (!g_set.cookies.empty()) a += L" --cookies-from-browser " + Q(g_set.cookies);
+    a += CookieArgs(&t.ckTmp);
     if (!g_set.rate.empty())    a += L" -r " + Q(g_set.rate);
     if (g_set.subs) {
         a += L" --write-subs --sub-langs " + Q(L"zh.*,en.*");
@@ -652,8 +694,13 @@ static void Worker(std::shared_ptr<Task> t, std::wstring exe, std::wstring args,
         else {
             t->st = TS_FAILED;
             if (t->err.empty()) t->err = T(L"yt-dlp 退出代码 ") + std::to_wstring((int)code);
+            std::wstring l = t->err;
+            for (auto& ch : l) ch = towlower(ch);
+            for (auto k : { L"sign in", L"log in", L"login", L"cookies", L"logged-in", L"members-only", L"private", L"not a bot", L"confirm you" })
+                if (l.find(k) != std::wstring::npos) { t->err = T(L"需要登录：右键选「在内置浏览器中登录」，登录后重新下载。 ") + t->err; break; }
         }
         t->speed = -1; t->eta = -1; t->dirty = true;
+        if (!t->ckTmp.empty()) { DeleteFileW(t->ckTmp.c_str()); t->ckTmp.clear(); }
     }
     if (c.job) CloseHandle(c.job);
     CloseHandle(c.proc);
@@ -662,7 +709,7 @@ static void Worker(std::shared_ptr<Task> t, std::wstring exe, std::wstring args,
 }
 
 static void Pump() {
-    if (g_ytdlp.empty()) return;
+    bool noYt = g_ytdlp.empty();
     std::vector<std::shared_ptr<Task>> start;
     {
         std::lock_guard<std::mutex> lk(g_mx);
@@ -670,13 +717,16 @@ static void Pump() {
         for (auto& t : g_tasks) if (IsActive(t->st)) ++running;
         for (auto& t : g_tasks) {
             if (running >= g_set.conc) break;
-            if (t->st == TS_QUEUED) {
+            if (t->st == TS_QUEUED && (!noYt || !t->media.empty())) {
                 t->st = TS_STARTING; t->cancel = false; t->err.clear(); t->dirty = true;
                 start.push_back(t); ++running;
             }
         }
     }
-    for (auto& t : start) std::thread(Worker, t, g_ytdlp, BuildArgs(*t), g_hwnd).detach();
+    for (auto& t : start) {
+        if (!t->media.empty()) std::thread(DirectWorker, t, g_hwnd).detach();
+        else std::thread(Worker, t, g_ytdlp, BuildArgs(*t), g_hwnd).detach();
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -767,10 +817,10 @@ static std::wstring JsonStr(const std::wstring& j) {
     return Trim(o);
 }
 
-static std::wstring CommonArgs() {
+static std::wstring CommonArgs(std::wstring* ckTmp) {
     std::wstring a;
     if (!g_set.proxy.empty())   a += L" --proxy " + Q(g_set.proxy);
-    if (!g_set.cookies.empty()) a += L" --cookies-from-browser " + Q(g_set.cookies);
+    a += CookieArgs(ckTmp);
     return a;
 }
 
@@ -778,10 +828,12 @@ static std::wstring CommonArgs() {
 // Playlists tab, a channel's Videos/Shorts/Live tabs) are opened one level deeper.
 static bool ListEntries(const std::wstring& exe, const std::wstring& url, int depth,
                         const std::shared_ptr<Task>& t, std::vector<Entry>& out, std::wstring& err) {
+    std::wstring ckTmp;
     std::wstring args = L"--flat-playlist --yes-playlist --no-colors --encoding utf-8 --no-warnings"
-                        L" --print " + Q(L"[E]%(url)s\t%(title)j\t%(playlist_title)j\t%(playlist_uploader,playlist_channel,channel,uploader)j") + CommonArgs() + L" -- " + Q(url);
+                        L" --print " + Q(L"[E]%(url)s\t%(title)j\t%(playlist_title)j\t%(playlist_uploader,playlist_channel,channel,uploader)j") + CommonArgs(&ckTmp) + L" -- " + Q(url);
     std::wstring text;
     DWORD code = RunCapture(exe, args, text);
+    if (!ckTmp.empty()) DeleteFileW(ckTmp.c_str());
     std::vector<Entry> found;
     size_t s = 0;
     while (s < text.size()) {
@@ -928,8 +980,11 @@ static void SaveTasks() {
             out += kind;
             for (auto& f : { t.url, t.outDir, std::to_wstring(t.fmt), std::to_wstring((int)t.playlist), t.title,
                              t.filepath, t.err, std::to_wstring((long long)t.total), std::to_wstring(t.plIdx),
-                             std::to_wstring(t.plCount) })
+                             std::to_wstring(t.plCount), t.mediaId })
                 out += L"\t" + Esc(f);
+            std::wstring m;
+            for (auto& u : t.media) m += (m.empty() ? L"" : L" ") + u;
+            out += L"\t" + Esc(m);
             out += L"\n";
         };
         for (auto& t : g_tasks) {
@@ -977,6 +1032,12 @@ static void LoadTasks() {
         t->title = f[4]; t->filepath = f[5]; t->err = f[6]; t->total = _wtof(f[7].c_str());
         if (t->total <= 0) t->total = -1;
         t->plIdx = _wtoi(f[8].c_str()); t->plCount = _wtoi(f[9].c_str());
+        if (f.size() >= 12 && !f[10].empty() && !f[11].empty()) {
+            t->mediaId = f[10];
+            size_t a2 = 0, b2;
+            while ((b2 = f[11].find(L' ', a2)) != std::wstring::npos) { t->media.push_back(f[11].substr(a2, b2 - a2)); a2 = b2 + 1; }
+            t->media.push_back(f[11].substr(a2));
+        }
         switch (ln[0]) {
         case L'D': t->st = TS_DONE; t->pct = 100; break;
         case L'F': t->st = TS_FAILED; break;
@@ -1153,7 +1214,7 @@ static void Layout() {
     RECT cr; GetWindowRect(g_hFmt, &cr);
     int ch = cr.bottom - cr.top;                 // closed combo height drives row height
     int m = S(14), g = S(8), bw = S(112), bh = std::max(ch + S(2), S(30)), lh = S(20);
-    HDWP dw = BeginDeferWindowPos(18);
+    HDWP dw = BeginDeferWindowPos(19);
     auto mv = [&](HWND h, int x, int y, int w, int hh) { dw = DeferWindowPos(dw, h, nullptr, x, y, w, hh, SWP_NOZORDER | SWP_NOACTIVATE); };
 
     int y = m;
@@ -1186,10 +1247,11 @@ static void Layout() {
         int bx = px + 2 * sw + g + S(14), bwid = S(90), bhh = S(8);
         int tx = bx + bwid + S(10);
         mv(g_hBusy, bx, y + (bh - bhh) / 2, bwid, bhh);
-        mv(g_hBusyTxt, tx, y + (bh - lh) / 2, std::max(S(10), W - m - 2 * bw - 2 * g - tx), lh);
+        mv(g_hBusyTxt, tx, y + (bh - lh) / 2, std::max(S(10), W - m - 3 * bw - 3 * g - tx), lh);
     }
     mv(g_hSettings, W - m - bw, y, bw, bh);
     mv(g_hOpenDir, W - m - 2 * bw - g, y, bw, bh);
+    mv(g_hLogin, W - m - 3 * bw - 2 * g, y, bw, bh);
     y += bh + S(12);
 
     mv(g_hList, m, y, W - 2 * m, std::max(S(40), H - sh - y - S(10)));
@@ -1304,6 +1366,8 @@ static void StopAll() {
     InvalidateRect(g_hList, nullptr, FALSE);
 }
 
+#include "browser.h"
+
 static void AddFromText(const std::wstring& text) {
     auto urls = ExtractUrls(text);
     if (urls.empty()) {
@@ -1323,9 +1387,11 @@ static void AddFromText(const std::wstring& text) {
         wholeList = r == ID_PL_ALL;
     }
     int last, added = 0, dup = 0;
+    std::vector<std::wstring> xhs;
     {
         std::lock_guard<std::mutex> lk(g_mx);
         for (auto& u : urls) {
+            if (IsXhs(u)) { xhs.push_back(u); continue; }   // collected in the built-in browser
             bool seen = false;
             for (auto& p : g_pending) if (p->url == u) seen = true;
             for (auto& x : g_tasks)
@@ -1341,6 +1407,14 @@ static void AddFromText(const std::wstring& text) {
             else g_tasks.push_back(t);
         }
         last = (int)g_tasks.size() - 1;
+    }
+    for (auto& u : xhs) OpenBrowser(u, true);
+    if (!xhs.empty() && !added && !dup) {
+        g_statusMsg = T(L"小红书链接已交给内置浏览器抓取");
+        SetStatusPart(0, g_statusMsg);
+        SetWindowTextW(g_hAdd, T(L"✓ 已添加"));
+        SetTimer(g_hwnd, 2, 1500, nullptr);
+        return;
     }
     RefreshListCount();
     if (last >= 0) ListView_EnsureVisible(g_hList, last, FALSE);
@@ -1658,6 +1732,7 @@ static void ShowContextMenu(int x, int y) {
     AppendMenuW(m, canRetry ? on : off, ID_RETRY, T(L"重新下载"));
     AppendMenuW(m, canCancel ? on : off, ID_CANCELTASK, T(L"取消"));
     AppendMenuW(m, any ? on : off, ID_COPYURL, T(L"复制链接"));
+    AppendMenuW(m, any ? on : off, ID_LOGINSITE, T(L"在内置浏览器中登录"));
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(m, any ? on : off, ID_REMOVE, T(L"移除\tDel"));
     AppendMenuW(m, (any && hasFile) ? on : off, ID_DELFILE, T(L"从硬盘删除文件"));
@@ -1670,7 +1745,7 @@ static void ShowContextMenu(int x, int y) {
 // ---------------------------------------------------------------------------
 // Settings dialog
 // ---------------------------------------------------------------------------
-static const wchar_t* kBrowsers[] = { L"不使用", L"firefox", L"chrome", L"edge", L"brave", L"opera", L"vivaldi", L"chromium" };
+static const wchar_t* kBrowsers[] = { L"不使用", L"builtin", L"firefox", L"chrome", L"edge", L"brave", L"opera", L"vivaldi", L"chromium" };
 
 static bool g_langChanged = false, g_restart = false;
 static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
@@ -1701,7 +1776,7 @@ static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
         c = GetDlgItem(d, IDC_COOKIES);
         int sel = 0;
         for (int i = 0; i < (int)(sizeof(kBrowsers) / sizeof(*kBrowsers)); ++i) {
-            SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)T(kBrowsers[i]));
+            SendMessageW(c, CB_ADDSTRING, 0, (LPARAM)(i == 1 ? T(L"内置浏览器（推荐）") : T(kBrowsers[i])));
             if (i && g_set.cookies == kBrowsers[i]) sel = i;
         }
         SendMessageW(c, CB_SETCURSEL, sel, 0);
@@ -1825,6 +1900,7 @@ static void OnCreate(HWND hwnd) {
     g_hBrowse  = MakeCtl(WC_BUTTONW, T(L"浏览…"), WS_TABSTOP | BS_PUSHBUTTON, IDC_BROWSE);
     g_hStartAll= MakeCtl(WC_BUTTONW, T(L"开始全部"), WS_TABSTOP | BS_PUSHBUTTON, IDC_STARTALL);
     g_hStopAll = MakeCtl(WC_BUTTONW, T(L"停止全部"), WS_TABSTOP | BS_PUSHBUTTON, IDC_STOPALL);
+    g_hLogin   = MakeCtl(WC_BUTTONW, T(L"登录网站…"), WS_TABSTOP | BS_PUSHBUTTON, IDC_LOGIN);
     g_hOpenDir = MakeCtl(WC_BUTTONW, T(L"打开文件夹"), WS_TABSTOP | BS_PUSHBUTTON, IDC_OPENDIR);
     g_hSettings= MakeCtl(WC_BUTTONW, T(L"设置…"), WS_TABSTOP | BS_PUSHBUTTON, IDC_SETTINGS);
     g_hList    = MakeCtl(WC_LISTVIEWW, L"", WS_TABSTOP | LVS_REPORT | LVS_OWNERDATA | LVS_SHOWSELALWAYS, IDC_LIST, WS_EX_CLIENTEDGE);
@@ -1930,6 +2006,16 @@ static void OnCommand(HWND hwnd, int id, int code) {
     case IDC_STOPALL:  StopAll(); break;
     case ID_OPENFILE:   { auto s = SelectedTasks(); if (!s.empty()) OpenTaskFile(s[0]); break; }
     case ID_OPENFOLDER: { auto s = SelectedTasks(); if (!s.empty()) OpenTaskFolder(s[0]); break; }
+    case IDC_LOGIN: OpenBrowser(L"", false); break;
+    case ID_LOGINSITE: {
+        auto s = SelectedTasks();
+        if (s.empty()) break;
+        std::wstring u = s[0]->url;              // open the site's front page: that is where people sign in
+        size_t k = u.find(L"://");
+        if (k != std::wstring::npos) { size_t e = u.find(L'/', k + 3); if (e != std::wstring::npos) u.resize(e + 1); }
+        OpenBrowser(u, false);
+        break;
+    }
     case ID_COPYURL: {
         std::wstring all;
         for (auto& t : SelectedTasks()) { if (!all.empty()) all += L"\r\n"; all += t->url; }
@@ -2145,6 +2231,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             for (auto& t : g_tasks) { t->cancel = true; if (t->job) TerminateJobObject(t->job, 1); }
             for (auto& t : g_pending) t->cancel = true;
         }
+        if (g_hBrowser) DestroyWindow(g_hBrowser);
         DestroyWindow(hwnd);
         return 0;
     case WM_DESTROY:
