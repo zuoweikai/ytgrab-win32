@@ -112,8 +112,8 @@
     });
     return out;
   };
-  const detail = async (n) => {
-    const url = 'https://www.xiaohongshu.com/explore/' + n.id + '?xsec_token=' + encodeURIComponent(n.token) + '&xsec_source=pc_user';
+  const detail = async (n, src) => {
+    const url = 'https://www.xiaohongshu.com/explore/' + n.id + '?xsec_token=' + encodeURIComponent(n.token) + '&xsec_source=' + (src || 'pc_user');
     for (let attempt = 0; attempt < 3; attempt++) {
       if (stopped()) return null;
       try {
@@ -186,15 +186,52 @@
     post('done', String(ok));
   };
 
+  // the note this page already shows (opened directly, or as a pop-up over the feed)
+  const fromPage = (id) => {
+    try {
+      const map = un(un(state().note || {}).noteDetailMap) || {};
+      const d = un(map[id]) || {};
+      const note = un(d.note);
+      if (note && (note.noteId || note.imageList || note.video)) return note;
+    } catch (e) {}
+    return null;
+  };
+  const fromDom = () => {
+    const out = [];
+    const root = document.querySelector('.note-detail-mask, #noteContainer, .note-container') || document;
+    const v = root.querySelector('video');
+    const vs = v && (v.currentSrc || v.src);
+    if (vs && /^https?:/.test(vs)) out.push(https(vs));
+    if (!out.length) root.querySelectorAll('.swiper-slide:not(.swiper-slide-duplicate) img, .note-slider-img, .media-container img').forEach((i) => {
+      const u = i.currentSrc || i.src;
+      if (u && /^https?:/.test(u) && !/avatar|emoji|picasso-static/.test(u) && !out.includes(https(u))) out.push(https(u));
+    });
+    return out;
+  };
+
   const crawlNote = async () => {
-    await sleep(rnd(1500, 2500));
-    const m = location.pathname.match(/\/(?:explore|discovery\/item)\/([0-9a-f]{24})/);
-    const tok = new URLSearchParams(location.search).get('xsec_token') || '';
+    await sleep(rnd(800, 1500));
+    const m = location.pathname.match(/\/(?:explore|discovery\/item|user\/profile\/[0-9a-f]+)\/([0-9a-f]{24})/);
+    const q = new URLSearchParams(location.search);
+    const tok = q.get('xsec_token') || '';
     let ok = 0;
     if (m) {
-      const d = await detail({ id: m[1], token: tok, title: '' });
-      if (d && sendNote({ id: m[1], token: tok, title: '' }, d, '')) ok = 1;
+      const n = { id: m[1], token: tok, title: '' };
+      let d = null;
+      const pn = fromPage(n.id);
+      if (pn && media(pn).length) d = { url: location.href, note: pn };
+      if (!d) d = await detail(n, q.get('xsec_source'));
+      if (d && sendNote(n, d, '')) ok = 1;
+      else {
+        const urls = fromDom();
+        if (urls.length) {
+          const title = (document.querySelector('#detail-title, .note-content .title') || {}).textContent || document.title.replace(/\s*-\s*小红书.*$/, '');
+          post('note', n.id, title.trim() || n.id, '', /video/.test(urls[0]) ? 'video' : 'image', location.href, urls.join(L));
+          ok = 1;
+        }
+      }
     }
+    if (!ok) status('nomedia');
     post('done', String(ok));
   };
 
@@ -203,7 +240,7 @@
     window.__ytgrabRunning = 1;
     window.__ytgrabStop = 0;
     const run = /\/user\/profile\/[0-9a-f]+\/?$/.test(location.pathname) ? crawlProfile
-      : /\/(?:explore|discovery\/item)\/[0-9a-f]{24}/.test(location.pathname) ? crawlNote : null;
+      : /\/(?:explore|discovery\/item|user\/profile\/[0-9a-f]+)\/[0-9a-f]{24}/.test(location.pathname) ? crawlNote : null;
     if (!run) { status('notpage'); post('done', '0'); window.__ytgrabRunning = 0; return; }
     run().catch((e) => { status('error', String(e)); post('done', '0'); }).finally(() => { window.__ytgrabRunning = 0; });
   };

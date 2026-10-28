@@ -220,6 +220,8 @@ static const TrPair EN_TABLE[] = {
     { L"共 ", L"" },
     { L" 条笔记，开始逐条读取…", L" notes found, reading them one by one…" },
     { L"完成，本次加入下载 ", L"Done, queued " },
+    { L"已经在下载列表里了，没有重复添加", L"Already in the download list, not added again" },
+    { L"没读到图片或视频：请刷新页面（或先登录）后再点一次", L"Couldn't read any photo or video: refresh the page (or sign in) and click again" },
     { L" 条", L"" },
     { L"小红书：已加入 ", L"Xiaohongshu: queued " },
     { L"小红书链接已交给内置浏览器抓取", L"Xiaohongshu link handed to the built-in browser" },

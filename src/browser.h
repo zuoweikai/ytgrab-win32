@@ -313,6 +313,7 @@ static void OnPageMessage(const std::wstring& msg) {
         else if (c == L"scroll") BStatus(T(L"正在浏览主页，已找到 ") + at(2) + T(L" 条笔记") + (at(3).empty() ? L"" : L" · " + at(3)));
         else if (c == L"read") BStatus(T(L"正在读取笔记 ") + at(2) + L" / " + at(3) + T(L"，已加入下载 ") + at(4));
         else if (c == L"notpage") BStatus(T(L"这个页面不是小红书主页或笔记"));
+        else if (c == L"nomedia") BStatus(T(L"没读到图片或视频：请刷新页面（或先登录）后再点一次"));
         else if (c == L"error") BStatus(T(L"出错：") + at(2));
     } else if (k == L"login") {
         if (IsIconic(g_hBrowser)) ShowWindow(g_hBrowser, SW_RESTORE);
@@ -326,7 +327,10 @@ static void OnPageMessage(const std::wstring& msg) {
         if (!at(1).empty() && !urls.empty()) AddMediaTask(at(1), at(2), at(3), at(5), urls);
     } else if (k == L"done") {
         ExportCookies();
-        BStatus(T(L"完成，本次加入下载 ") + std::to_wstring(g_crawlAdded) + T(L" 条"));
+        int pageOk = _wtoi(at(1).c_str());
+        if (g_crawlAdded == 0 && pageOk > 0) BStatus(T(L"已经在下载列表里了，没有重复添加"));
+        else if (g_crawlAdded == 0) BStatus(T(L"没读到图片或视频：请刷新页面（或先登录）后再点一次"));
+        else BStatus(T(L"完成，本次加入下载 ") + std::to_wstring(g_crawlAdded) + T(L" 条"));
         g_statusMsg = T(L"小红书：已加入 ") + std::to_wstring(g_crawlAdded) + T(L" 个下载任务");
         SetStatusPart(0, g_statusMsg);
         g_crawling = false;
@@ -401,6 +405,8 @@ static LRESULT CALLBACK BrowserProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 StartCrawlHere();
             } else {
                 BStatus(T(L"目前只能抓取小红书主页或笔记；其他网站登录后直接在主窗口粘贴链接即可"));
+                MessageBoxW(hwnd, T(L"目前只能抓取小红书主页或笔记；其他网站登录后直接在主窗口粘贴链接即可"),
+                            T(L"YtGrab 内置浏览器"), MB_OK | MB_ICONINFORMATION);
             }
             return 0;
         }

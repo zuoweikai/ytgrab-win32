@@ -1,11 +1,14 @@
 ## What's new / 更新内容
 
+- **"Grab this page" on a single Xiaohongshu note now works.** It reads the note straight from the page you're looking at (including a note opened as a pop-up over the feed), falls back to the photos/video on screen, and says why when nothing was added (already in the list, or nothing readable). On other sites the button now shows a message instead of seeming to do nothing.
+  **小红书单条笔记「抓取本页全部」修复。** 直接从当前页面读取笔记（包括在首页弹出的笔记），读不到时改用页面上显示的图片/视频；没加入任务时会说明原因（已在列表中或没读到内容）。在其他网站点击会弹出提示，不再像没反应。
+
+### Earlier / 之前
+
 - **Built-in browser (WebView2).** New **Sign in…** button: sign in to any site (YouTube, Bilibili, Douyin, Instagram, members-only content…) once inside YtGrab, and downloads use that sign-in automatically. This also works when Chrome/Edge cookies can't be read. Settings > Cookies from now defaults to **Built-in browser**. A failed download that needs a sign-in says so; right-click > **Sign in with built-in browser** opens that site.
   **内置浏览器（WebView2）。** 新增「登录网站…」按钮：在 YtGrab 里登录任意网站（YouTube、B 站、抖音、Instagram、会员内容等）一次，之后下载自动带上登录状态，Chrome/Edge 的 Cookies 读不出来也没关系。设置里「Cookies 来源」默认改为「内置浏览器」。需要登录而失败的任务会提示，右键「在内置浏览器中登录」直接打开该网站。
 - **Xiaohongshu home pages, every note.** Paste a Xiaohongshu profile or share link (xhslink) and the built-in browser opens it, asks you to sign in the first time, then scrolls the page slowly at an uneven, human pace and reads each note one by one with pauses. Videos and image notes (all pictures, Live Photos too) are saved to `<save folder>\<creator>`. Single note links work too, including image notes. Large profiles take a while on purpose; Xiaohongshu may still ask for verification, in which case it waits and retries.
   **小红书主页全部笔记。** 粘贴小红书主页或分享短链，内置浏览器打开，首次需要在窗口里登录，之后像真人一样慢速、随机地滚动主页，再逐条读取笔记并穿插停顿。视频和图文（全部图片，含实况图）保存到「保存目录\博主名」。单条笔记链接（含图文）也支持。为降低风控，大主页会比较慢；若小红书要求验证，会自动等待后重试。
-
-### Earlier / 之前
 
 - **Creator home pages**: a channel / profile link (YouTube @channel, Bilibili space, TikTok, Douyin, Instagram, Kuaishou, Xiaohongshu) saves its videos in a folder named after the creator.
   解析博主主页（YouTube 频道、B 站空间、TikTok、抖音、Instagram、快手、小红书）时，先建一个以博主名命名的文件夹再保存。
