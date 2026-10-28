@@ -696,8 +696,36 @@ static bool IsYouTubeVideo(const std::wstring& u) {
            l.find(L"/embed/") != std::wstring::npos;
 }
 
+static bool Has(const std::wstring& l, const wchar_t* s) { return l.find(s) != std::wstring::npos; }
+
+// A creator's home page (YouTube channel, Bilibili space, TikTok/Douyin/Instagram/Kuaishou/Xiaohongshu
+// profile). Its videos are saved in a folder named after the creator.
+static bool IsProfile(const std::wstring& u) {
+    std::wstring l = Lower(u);
+    if (IsYouTube(u))
+        return !IsYouTubeVideo(u) && !Has(l, L"list=") && !Has(l, L"/playlist") &&
+               (Has(l, L"/@") || Has(l, L"/channel/") || Has(l, L"/c/") || Has(l, L"/user/"));
+    if (Has(l, L"space.bilibili.com/"))
+        return !Has(l, L"/lists") && !Has(l, L"/favlist") && !Has(l, L"/channel/");
+    if (Has(l, L"tiktok.com/@")) return !Has(l, L"/video/") && !Has(l, L"/photo/");
+    if (Has(l, L"douyin.com/user/")) return !Has(l, L"modal_id=");
+    if (Has(l, L"kuaishou.com/profile/") || Has(l, L"xiaohongshu.com/user/profile/")) return true;
+    size_t ig = l.find(L"instagram.com/");
+    if (ig != std::wstring::npos) {
+        std::wstring path = l.substr(ig + 14);
+        size_t q = path.find_first_of(L"?#"); if (q != std::wstring::npos) path.resize(q);
+        while (!path.empty() && path.back() == L'/') path.pop_back();
+        static const wchar_t* notUser[] = { L"p", L"reel", L"reels", L"tv", L"stories", L"explore", L"accounts" };
+        if (path.empty() || path.find(L'/') != std::wstring::npos) return false;
+        for (auto n : notUser) if (path == n) return false;
+        return true;
+    }
+    return false;
+}
+
 // Links that hold several videos: playlists, channels, channel tabs, list= on any site.
 static bool LooksLikeList(const std::wstring& u) {
+    if (IsProfile(u)) return true;
     std::wstring l = Lower(u);
     if (l.find(L"list=") != std::wstring::npos || l.find(L"/playlist") != std::wstring::npos) return true;
     if (IsYouTube(u) && !IsYouTubeVideo(u)) return true;   // @handle, /channel/, /c/, /user/, tabs
@@ -715,7 +743,7 @@ static std::wstring SafeFolder(std::wstring n) {
     return n;
 }
 
-struct Entry { std::wstring url, title, list; };
+struct Entry { std::wstring url, title, list, owner; };
 
 // Decodes a value printed with yt-dlp's %(...)j (a JSON string); newlines become spaces.
 static std::wstring JsonStr(const std::wstring& j) {
@@ -751,7 +779,7 @@ static std::wstring CommonArgs() {
 static bool ListEntries(const std::wstring& exe, const std::wstring& url, int depth,
                         const std::shared_ptr<Task>& t, std::vector<Entry>& out, std::wstring& err) {
     std::wstring args = L"--flat-playlist --yes-playlist --no-colors --encoding utf-8 --no-warnings"
-                        L" --print " + Q(L"[E]%(url)s\t%(title)j\t%(playlist_title)j") + CommonArgs() + L" -- " + Q(url);
+                        L" --print " + Q(L"[E]%(url)s\t%(title)j\t%(playlist_title)j\t%(playlist_uploader,playlist_channel,channel,uploader)j") + CommonArgs() + L" -- " + Q(url);
     std::wstring text;
     DWORD code = RunCapture(exe, args, text);
     std::vector<Entry> found;
@@ -767,10 +795,15 @@ static bool ListEntries(const std::wstring& exe, const std::wstring& url, int de
             if (b != std::wstring::npos) {
                 size_t c = line.find(L'\t', b + 1);
                 en.title = line.substr(b + 1, c == std::wstring::npos ? std::wstring::npos : c - b - 1);
-                if (c != std::wstring::npos) en.list = line.substr(c + 1);
+                if (c != std::wstring::npos) {
+                    size_t d = line.find(L'\t', c + 1);
+                    en.list = line.substr(c + 1, d == std::wstring::npos ? std::wstring::npos : d - c - 1);
+                    if (d != std::wstring::npos) en.owner = line.substr(d + 1);
+                }
             }
             en.title = JsonStr(en.title);
             en.list = JsonStr(en.list);
+            en.owner = JsonStr(en.owner);
             if (en.url.compare(0, 4, L"http") == 0) found.push_back(en);
         } else if (line.compare(0, 6, L"ERROR:") == 0 && err.empty()) {
             err = Trim(line.substr(6));
@@ -810,6 +843,23 @@ static void Expander(std::shared_ptr<Task> t, std::wstring exe, HWND hwnd) {
             g_tasks.push_back(t);
             added = 1;
         } else {
+            // A creator's home page: everything goes into <save folder>\<creator>.
+            std::wstring owner;
+            if (IsProfile(t->url)) for (auto& e : v) if (!(owner = SafeFolder(e.owner)).empty()) break;
+            if (!owner.empty()) {
+                std::wstring dir = t->outDir + L"\\" + owner;
+                int n = (int)v.size(), i = 0;
+                for (auto& e : v) {
+                    auto k = std::make_shared<Task>();
+                    k->id = g_nextId++;
+                    k->url = e.url; k->title = e.title; k->outDir = dir; k->fmt = t->fmt;
+                    k->playlist = false; k->plIdx = ++i; k->plCount = n;
+                    g_tasks.push_back(k);
+                    ++added;
+                }
+                PostMessageW(hwnd, WM_APP_EXPANDED, 0, added);
+                return;
+            }
             std::vector<std::wstring> lists;
             for (auto& e : v) if (std::find(lists.begin(), lists.end(), e.list) == lists.end()) lists.push_back(e.list);
             for (auto& l : lists) {

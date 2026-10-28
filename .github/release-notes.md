@@ -1,5 +1,7 @@
 ## What's new / 更新内容
 
+- **Creator home pages**: a channel / profile link (YouTube @channel, Bilibili space, TikTok, Douyin, Instagram, Kuaishou, Xiaohongshu) saves its videos in a folder named after the creator.
+  解析博主主页（YouTube 频道、B 站空间、TikTok、抖音、Instagram、快手、小红书）时，先建一个以博主名命名的文件夹再保存。
 - **"Parse & download"** is the new name of the add button. The task menu gains **Delete file from disk** (to the Recycle Bin, after a confirmation).
   按钮改名为「解析并下载」；任务右键菜单新增「从硬盘删除文件」（确认后移到回收站）。
 - **Playlist prompt.** The "Whole playlist" checkbox is gone. A video link that sits inside a playlist now asks: only this video, or the whole playlist. Playlist and channel links still expand into one task per video.
