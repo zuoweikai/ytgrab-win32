@@ -1763,6 +1763,26 @@ static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
                 if (_wcsicmp(cls, L"Edit") && _wcsicmp(cls, L"ComboBox") && GetWindowTextW(h, t, 256) > 0) SetWindowTextW(h, T(t));
                 return TRUE;
             }, 0);
+            // line each label up with the box beside it (same top, same height, text centred vertically)
+            EnumChildWindows(d, [](HWND h, LPARAM lp) -> BOOL {
+                HWND dlg = (HWND)lp;
+                wchar_t cls[32];
+                GetClassNameW(h, cls, 32);
+                if (_wcsicmp(cls, L"Static") || GetDlgCtrlID(h) == IDC_COMPINFO) return TRUE;
+                RECT rl; GetWindowRect(h, &rl); MapWindowPoints(nullptr, dlg, (POINT*)&rl, 2);
+                HWND best = nullptr; RECT rb{}; int bestDx = 1 << 30;
+                for (HWND c = GetWindow(dlg, GW_CHILD); c; c = GetWindow(c, GW_HWNDNEXT)) {
+                    GetClassNameW(c, cls, 32);
+                    if (_wcsicmp(cls, L"ComboBox") && _wcsicmp(cls, L"Edit")) continue;
+                    RECT rc; GetWindowRect(c, &rc); MapWindowPoints(nullptr, dlg, (POINT*)&rc, 2);
+                    if (rc.left <= rl.left || rc.bottom <= rl.top || rc.top >= rl.bottom) continue;
+                    if (rc.left - rl.left < bestDx) { bestDx = rc.left - rl.left; best = c; rb = rc; }
+                }
+                if (!best) return TRUE;
+                SetWindowLongW(h, GWL_STYLE, GetWindowLongW(h, GWL_STYLE) | SS_CENTERIMAGE);
+                SetWindowPos(h, nullptr, rl.left, rb.top, rl.right - rl.left, rb.bottom - rb.top, SWP_NOZORDER | SWP_NOACTIVATE);
+                return TRUE;
+            }, (LPARAM)d);
             HWND lc = GetDlgItem(d, IDC_LANG);
             SendMessageW(lc, CB_ADDSTRING, 0, (LPARAM)T(L"跟随系统"));
             SendMessageW(lc, CB_ADDSTRING, 0, (LPARAM)L"简体中文");
