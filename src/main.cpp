@@ -170,7 +170,7 @@ static const TrPair EN_TABLE[] = {
     { L"就绪", L"Ready" },
     { L"已恢复 ", L"Restored " },
     { L" 个任务", L" task(s)" },
-    { L"还没有下载任务。粘贴视频链接后点击「解析并下载」，或在列表中按 Ctrl+V。", L"No downloads yet. Paste video links and click \"Parse & download\", or press Ctrl+V in the list." },
+    { L"还没有下载任务。粘贴视频链接后点击「解析并下载」，或在列表中按 Ctrl+V。", L"No downloads yet. Paste video links and click \"Parse && download\", or press Ctrl+V in the list." },
     { L"还有 ", L"" },
     { L" 个任务正在下载，退出将暂停它们，下次打开后点「开始全部」继续。确定退出吗？", L" download(s) still running. Quitting pauses them; click \"Start all\" next time to resume. Quit now?" },
     { L"列表已展开为 ", L"List expanded into " },
@@ -1208,8 +1208,13 @@ static void StartComponent(int which) {
 // ---------------------------------------------------------------------------
 // UI helpers
 // ---------------------------------------------------------------------------
+static std::wstring g_sbText[5];
+static void FitStatusParts();
 static void SetStatusPart(int part, const std::wstring& s) {
+    bool refit = part > 0 && part < 5 && g_sbText[part].size() != s.size();
+    if (part >= 0 && part < 5) g_sbText[part] = s;
     SendMessageW(g_hStatus, SB_SETTEXTW, part, (LPARAM)s.c_str());
+    if (refit) FitStatusParts();
 }
 
 static void UpdateToolStatus() {
@@ -1241,8 +1246,41 @@ static void UpdateRowHeight() {
     ListView_SetImageList(g_hList, g_rowIml, LVSIL_SMALL);
 }
 
+static void FitNameColumn();
 static void UpdateColumns() {
     for (int i = 0; i < kCols; ++i) ListView_SetColumnWidth(g_hList, i, S(kColW[i]));
+    FitNameColumn();
+}
+
+// Status bar: parts 1-4 are as wide as their text, part 0 takes what is left
+static void FitStatusParts() {
+    if (!g_hStatus) return;
+    RECT rc; GetClientRect(g_hStatus, &rc);
+    int W = rc.right;
+    HDC dc = GetDC(g_hStatus);
+    HGDIOBJ old = SelectObject(dc, (HFONT)SendMessageW(g_hStatus, WM_GETFONT, 0, 0));
+    int w[5] = {};
+    for (int i = 1; i < 5; ++i) {
+        SIZE sz{}; const std::wstring& t = g_sbText[i];
+        GetTextExtentPoint32W(dc, t.c_str(), (int)t.size(), &sz);
+        w[i] = std::max(S(60), (int)sz.cx + S(20));
+    }
+    SelectObject(dc, old); ReleaseDC(g_hStatus, dc);
+    w[4] += GetSystemMetrics(SM_CXVSCROLL);   // size grip
+    int parts[5]; int x = W;
+    parts[4] = -1;
+    for (int i = 4; i >= 1; --i) { x -= w[i]; parts[i - 1] = std::max(x, S(40)); }
+    SendMessageW(g_hStatus, SB_SETPARTS, 5, (LPARAM)parts);
+}
+
+// Name column takes the width the other columns leave
+static void FitNameColumn() {
+    if (!g_hList) return;
+    RECT rc; GetClientRect(g_hList, &rc);
+    int others = 0;
+    for (int i = 1; i < kCols; ++i) others += ListView_GetColumnWidth(g_hList, i);
+    int w = std::max(S(160), (int)rc.right - others);
+    if (ListView_GetColumnWidth(g_hList, 0) != w) ListView_SetColumnWidth(g_hList, 0, w);
 }
 
 static void Layout() {
@@ -1252,9 +1290,7 @@ static void Layout() {
     SendMessageW(g_hStatus, WM_SIZE, 0, 0);
     RECT sr; GetWindowRect(g_hStatus, &sr);
     int sh = sr.bottom - sr.top;
-    int parts[5] = { W - S(470), W - S(330), W - S(220), W - S(100), -1 };
-    for (int& p : parts) if (p != -1) p = std::max(p, S(40));
-    SendMessageW(g_hStatus, SB_SETPARTS, 5, (LPARAM)parts);
+    FitStatusParts();
 
     RECT cr; GetWindowRect(g_hFmt, &cr);
     int ch = cr.bottom - cr.top;                 // closed combo height drives row height
@@ -1301,6 +1337,7 @@ static void Layout() {
 
     mv(g_hList, m, y, W - 2 * m, std::max(S(40), H - sh - y - S(10)));
     EndDeferWindowPos(dw);
+    FitNameColumn();
 }
 
 static std::vector<std::wstring> ExtractUrls(const std::wstring& s) {
@@ -1690,6 +1727,7 @@ static void ShowSelectionInfo() {
 }
 
 static void OnTimer() {
+    FitNameColumn();   // the vertical scroll bar may have come or gone
     std::vector<int> dirty;
     int active = 0, queued = 0, reading = 0;
     double speed = 0, pctSum = 0;
