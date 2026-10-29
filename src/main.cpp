@@ -1389,11 +1389,13 @@ static void RefreshListCount() {
     InvalidateRect(g_hList, nullptr, FALSE);
 }
 
+static bool Ask(HWND owner, const std::wstring& head, const std::wstring& body,
+                const std::wstring& ok, const std::wstring& cancel, bool danger);
 static void PromptYtdlp() {
     if (g_compBusy) return;
     if (Ask(g_hwnd, T(L"没有找到 yt-dlp"),
             T(L"要现在从 GitHub 下载最新版吗（约 18 MB）？也可以手动把 yt-dlp.exe 放在本程序同一目录下。"),
-            T(L"立即下载"), T(L"取消")))
+            T(L"立即下载"), T(L"取消"), false))
         StartComponent(ID_GET_YTDLP);
 }
 
@@ -1510,7 +1512,7 @@ static INT_PTR CALLBACK MsgProc(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
 }
 // Silent replacement for MessageBox. cancel empty = single button. Returns true for the primary button.
 static bool Ask(HWND owner, const std::wstring& head, const std::wstring& body,
-                const std::wstring& ok, const std::wstring& cancel = L"", bool danger = false) {
+                const std::wstring& ok, const std::wstring& cancel, bool danger) {
     MsgArgs a{ head, body, ok, cancel, danger, owner };
     return DialogBoxParamW(g_hInst, MAKEINTRESOURCEW(IDD_MSG), owner ? owner : g_hwnd, MsgProc, (LPARAM)&a) == IDOK;
 }
@@ -2002,7 +2004,7 @@ static INT_PTR CALLBACK SubLangsProc(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
             for (int i = 0; i < kSubLangCount; ++i)
                 if (IsDlgButtonChecked(d, IDC_SL_FIRST + i) == BST_CHECKED) r += (r.empty() ? L"" : L",") + std::wstring(kSubLangs[i].code);
             if (r.empty()) {
-                Ask(d, T(L"请至少选择一种字幕语言"), L"", T(L"确定"));
+                Ask(d, T(L"请至少选择一种字幕语言"), L"", T(L"确定"), L"", false);
                 return TRUE;
             }
             *(std::wstring*)GetWindowLongPtrW(d, DWLP_USER) = r;
@@ -2348,7 +2350,7 @@ static void OnCommand(HWND hwnd, int id, int code) {
             if (g_langChanged &&
                 Ask(hwnd, L"重启 YtGrab？  Restart YtGrab?",
                     L"界面语言将在重启后生效，未完成的下载会保留。\nThe new language applies after a restart. Unfinished downloads are kept.",
-                    L"重启 Restart", L"稍后 Later")) {
+                    L"重启 Restart", L"稍后 Later", false)) {
                 g_restart = true;
                 PostMessageW(hwnd, WM_CLOSE, 0, 0);
             }
@@ -2491,7 +2493,7 @@ static bool ConfirmClose() {
     }
     if (!active) return true;
     std::wstring m = std::wstring(T(L"还有 ")) + std::to_wstring(active) + T(L" 个任务正在下载");
-    return Ask(g_hwnd, m, T(L"退出会暂停它们，下次打开后点「开始全部」继续。"), T(L"退出"), T(L"取消"));
+    return Ask(g_hwnd, m, T(L"退出会暂停它们，下次打开后点「开始全部」继续。"), T(L"退出"), T(L"取消"), false);
 }
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -2574,7 +2576,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (g_hSettingsDlg) ShowCompInfo(g_hSettingsDlg);
             if (g_hSettingsDlg)
                 SetDlgItemTextW(g_hSettingsDlg, IDC_COMPINFO, wp == 1 ? T(L"完成") : T(L"失败，详见状态栏"));
-            if (wp == 2) Ask(g_hSettingsDlg ? g_hSettingsDlg : hwnd, T(L"操作没有完成"), *m, T(L"确定"));
+            if (wp == 2) Ask(g_hSettingsDlg ? g_hSettingsDlg : hwnd, T(L"操作没有完成"), *m, T(L"确定"), L"", false);
             Pump();
         }
         return 0;
