@@ -1407,27 +1407,6 @@ static bool IsVideoInList(const std::wstring& u) {
 
 enum { ID_PL_ONE = 101, ID_PL_ALL = 102 };
 // Shared look for our silent panels (no system sound, no title bar).
-static void DrawPrimaryBtn(HWND d, const DRAWITEMSTRUCT* di, bool danger) {
-    bool down = di->itemState & ODS_SELECTED, focus = di->itemState & ODS_FOCUS;
-    COLORREF fill = danger ? (down ? RGB(160, 32, 20) : RGB(196, 43, 28))
-                           : (down ? RGB(0, 84, 158) : RGB(0, 103, 192));
-    FillRect(di->hDC, &di->rcItem, GetSysColorBrush(COLOR_BTNFACE));
-    HBRUSH br = CreateSolidBrush(fill);
-    HPEN pen = CreatePen(PS_SOLID, 1, fill);
-    HGDIOBJ ob = SelectObject(di->hDC, br), op = SelectObject(di->hDC, pen);
-    int r = S(6);
-    RoundRect(di->hDC, di->rcItem.left, di->rcItem.top, di->rcItem.right, di->rcItem.bottom, r, r);
-    SelectObject(di->hDC, ob); SelectObject(di->hDC, op); DeleteObject(br); DeleteObject(pen);
-    wchar_t t[64]; GetWindowTextW(di->hwndItem, t, 64);
-    SetBkMode(di->hDC, TRANSPARENT); SetTextColor(di->hDC, RGB(255, 255, 255));
-    HGDIOBJ of = SelectObject(di->hDC, (HFONT)SendMessageW(d, WM_GETFONT, 0, 0));
-    RECT rc = di->rcItem;
-    DrawTextW(di->hDC, t, -1, &rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-    SelectObject(di->hDC, of);
-    if (focus && !(di->itemState & ODS_NOFOCUSRECT)) {
-        RECT fr = di->rcItem; InflateRect(&fr, -S(3), -S(3)); DrawFocusRect(di->hDC, &fr);
-    }
-}
 static HFONT MakeHeadFont(HWND d) {
     LOGFONTW lf{};
     GetObjectW((HFONT)SendMessageW(d, WM_GETFONT, 0, 0), sizeof(lf), &lf);
@@ -1491,13 +1470,6 @@ static INT_PTR CALLBACK MsgProc(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
         } else SetFocus(hOk);
         return FALSE;
     }
-    case WM_DRAWITEM:
-        if (((DRAWITEMSTRUCT*)lp)->CtlID == IDOK) {
-            auto* a = (MsgArgs*)GetWindowLongPtrW(d, DWLP_USER);
-            DrawPrimaryBtn(d, (DRAWITEMSTRUCT*)lp, a && a->danger);
-            return TRUE;
-        }
-        break;
     case WM_LBUTTONDOWN:
         ReleaseCapture(); SendMessageW(d, WM_NCLBUTTONDOWN, HTCAPTION, 0);
         return TRUE;
@@ -1533,9 +1505,6 @@ static INT_PTR CALLBACK PlaylistProc(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
         SetFocus(GetDlgItem(d, IDC_PL_ONE));
         return FALSE;
     }
-    case WM_DRAWITEM:
-        if (((DRAWITEMSTRUCT*)lp)->CtlID == IDOK) { DrawPrimaryBtn(d, (DRAWITEMSTRUCT*)lp, false); return TRUE; }
-        break;
     case WM_LBUTTONDOWN:   // no title bar: drag anywhere on the panel
         ReleaseCapture(); SendMessageW(d, WM_NCLBUTTONDOWN, HTCAPTION, 0);
         return TRUE;
