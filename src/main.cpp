@@ -195,6 +195,10 @@ static const TrPair EN_TABLE[] = {
     { L"代理：", L"Proxy:" },
     { L"使用浏览器 Cookies：", L"Browser cookies:" },
     { L"组件", L"Components" },
+    { L"正在下载视频", L"Downloading video" },
+    { L"正在下载音频", L"Downloading audio" },
+    { L"正在合并", L"Merging" },
+    { L"正在处理", L"Processing" },
     { L"没有找到 yt-dlp", L"yt-dlp was not found" },
     { L"要现在从 GitHub 下载最新版吗（约 18 MB）？也可以手动把 yt-dlp.exe 放在本程序同一目录下。", L"Download the latest version from GitHub now (about 18 MB)? You can also put yt-dlp.exe in the same folder as this program." },
     { L"立即下载", L"Download" },
@@ -485,6 +489,12 @@ struct Task {
     TaskState st = TS_QUEUED;
     double pct = 0, total = -1, speed = -1, eta = -1;
     int plIdx = 0, plCount = 0;
+    // separate video + audio streams: show one combined 0-100%
+    int nParts = 1, part = 0;        // streams to download for the current item / index of the one in progress
+    double partSize[2] = { -1, -1 }; // from yt-dlp's format info (may be unknown)
+    double doneBytes = 0;            // bytes of streams already finished
+    bool part0Audio = false;         // first stream is audio-only (rare format orders)
+    std::wstring partId[2];          // format ids, to tell stream progress from subtitle downloads
     bool pause = false;       // stopped by "停止全部": ends as paused, not canceled
     bool expand = false;      // playlist/channel link: list its videos as separate tasks first
     std::wstring mediaId;     // Xiaohongshu note collected by the built-in browser: direct media links
@@ -665,10 +675,13 @@ static std::wstring BuildArgs(Task& t) {
     std::wstring a;
     a += L"--newline --progress --no-simulate --no-colors --encoding utf-8 --no-mtime --windows-filenames";
     a += L" --print " + Q(L"before_dl:[T]%(title)s");
+    a += L" --print " + Q(L"before_dl:[S]%(requested_formats.0.filesize,requested_formats.0.filesize_approx)s;"
+                         L"%(requested_formats.1.filesize,requested_formats.1.filesize_approx)s;%(requested_formats.0.vcodec)s;"
+                         L"%(requested_formats.0.format_id)s;%(requested_formats.1.format_id)s");
     a += L" --print " + Q(L"after_move:[F]%(filepath)s");
     a += L" --progress-template " + Q(L"download:[P]%(progress.downloaded_bytes)s|%(progress.total_bytes)s|"
                                       L"%(progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s|"
-                                      L"%(info.playlist_index)s|%(info.n_entries)s|%(progress.status)s");
+                                      L"%(info.playlist_index)s|%(info.n_entries)s|%(progress.status)s|%(info.format_id)s");
     a += L" -P " + Q(t.outDir);
     a += L" -o " + Q(L"%(title).180B [%(id)s].%(ext)s");
     int f = (t.fmt >= 0 && t.fmt < kFormatCount) ? t.fmt : 0;
@@ -703,18 +716,61 @@ static void HandleLine(Task& t, const std::wstring& line) {
         if (f.size() < 8) return;
         double dl = Num(f[0]), tot = Num(f[1]);
         if (tot <= 0) tot = Num(f[2]);
-        if (tot > 0 && dl >= 0) t.pct = std::min(100.0, dl * 100.0 / tot);
-        if (tot > 0) t.total = tot;
+        if (t.nParts == 2) {
+            std::wstring id = f.size() > 8 ? f[8] : L"";
+            if (id == t.partId[0]) t.part = 0;
+            else if (id == t.partId[1]) t.part = 1;
+            else return;   // subtitles etc.: keep the stream progress as it is
+            t.doneBytes = t.part == 1 ? (t.partSize[0] > 0 ? t.partSize[0] : 0) : 0;
+        }
+        int pi = std::min(t.part, 1);
+        if (tot > 0 && t.nParts == 2) t.partSize[pi] = tot;   // the live figure beats the estimate
+        if (t.nParts == 2) {
+            // combined size: known parts, unknown audio guessed at 10% of video, unknown video at 9x audio
+            double s0 = t.partSize[0], s1 = t.partSize[1];
+            bool a0 = t.part0Audio;
+            double v = a0 ? s1 : s0, au = a0 ? s0 : s1;
+            if (v <= 0 && au > 0) v = au * 9;
+            if (au <= 0 && v > 0) au = v / 9;
+            double all = v + au;
+            if (all > 0 && dl >= 0) t.pct = std::min(99.0, (t.doneBytes + dl) * 100.0 / all);
+            if (all > 0) t.total = all;
+        } else {
+            if (tot > 0 && dl >= 0) t.pct = std::min(100.0, dl * 100.0 / tot);
+            if (tot > 0) t.total = tot;
+        }
         t.speed = Num(f[3]);
         t.eta = Num(f[4]);
         double idx = Num(f[5]), cnt = Num(f[6]);
         if (idx > 0 && cnt > 0) { t.plIdx = (int)idx; t.plCount = (int)cnt; }
-        if (f[7] == L"finished") { t.pct = 100; t.st = TS_PROCESSING; t.speed = -1; t.eta = -1; }
+        if (f[7] == L"finished") {
+            if (t.nParts == 2 && t.part == 0) { t.speed = -1; t.eta = -1; }   // audio comes next
+            else { t.pct = t.nParts == 2 ? 99 : 100; t.st = TS_PROCESSING; t.speed = -1; t.eta = -1; }
+        }
         else if (!t.cancel) t.st = TS_DOWNLOADING;
         t.dirty = true;
     } else if (line.compare(0, 3, L"[T]") == 0) {
         t.title = line.substr(3);
         t.pct = 0; t.total = -1;
+        t.nParts = 1; t.part = 0; t.doneBytes = 0; t.partSize[0] = t.partSize[1] = -1; t.part0Audio = false;
+        t.dirty = true;
+    } else if (line.compare(0, 3, L"[S]") == 0) {
+        // "<size0>;<size1>;<vcodec0>": two entries = separate video and audio downloads
+        std::vector<std::wstring> g;
+        { std::wstring r = line.substr(3); size_t s0 = 0, q;
+          while ((q = r.find(L';', s0)) != std::wstring::npos) { g.push_back(r.substr(s0, q - s0)); s0 = q + 1; }
+          g.push_back(r.substr(s0)); }
+        if (g.size() >= 5) {
+            if (g[2] != L"NA" && g[4] != L"NA") {
+                t.nParts = 2;
+                t.partSize[0] = Num(g[0]);
+                t.partSize[1] = Num(g[1]);
+                t.part0Audio = g[2] == L"none";
+                t.partId[0] = g[3]; t.partId[1] = g[4];
+                double all = (t.partSize[0] > 0 ? t.partSize[0] : 0) + (t.partSize[1] > 0 ? t.partSize[1] : 0);
+                if (t.partSize[0] > 0 && t.partSize[1] > 0) t.total = all;
+            }
+        }
         t.dirty = true;
     } else if (line.compare(0, 3, L"[F]") == 0) {
         t.filepath = line.substr(3);
@@ -1756,7 +1812,10 @@ static void OnGetDispInfo(NMLVDISPINFOW* di) {
         case 4: if (t.st == TS_DOWNLOADING && t.speed > 0) s = FmtBytes(t.speed) + L"/s"; break;
         case 5: if (t.st == TS_DOWNLOADING) s = FmtEta(t.eta); break;
         case 6:
-            if (t.st == TS_FAILED) s = t.err;
+            if (t.st == TS_DOWNLOADING && t.nParts == 2)
+                s = ((t.part == 0) != t.part0Audio) ? T(L"正在下载视频") : T(L"正在下载音频");
+            else if (t.st == TS_PROCESSING) s = t.nParts == 2 ? T(L"正在合并") : T(L"正在处理");
+            else if (t.st == TS_FAILED) s = t.err;
             else if (!t.filepath.empty()) s = t.filepath;
             else s = t.url;
             break;
