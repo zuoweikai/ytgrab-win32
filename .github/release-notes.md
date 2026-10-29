@@ -1,5 +1,14 @@
 ## What's new / 更新内容
 
+- **New playlist prompt.** A clean panel with a bold heading and two choices ("Only this video" is selected), plus OK and Cancel.
+  **播放列表询问改版。** 新样式面板：粗体标题、两个选项（默认「只下载当前视频」），右下角「确定」「取消」。
+- **Speed limit box lines up with its unit box.**
+  **限速输入框与单位下拉框对齐。**
+- **No more sounds.** Every message and confirmation is now a silent panel in the same style; Delete uses a red button with Cancel focused by default.
+  **全程无提示音。** 所有提示和确认框都换成同样式的静音面板；删除文件用红色按钮，默认选中「取消」。
+
+### Earlier / 之前
+
 - **Subtitles in 13 languages.** Settings > Subtitles now has a **Languages…** button: pick any of English, Simplified/Traditional Chinese, Japanese, Korean, Spanish, French, German, Russian, Vietnamese, Thai, Portuguese, Arabic (Select all / Clear). Default stays English + Simplified Chinese.
   **字幕支持 13 种语言。** 设置里「下载字幕」旁新增「字幕语言…」按钮，可多选英语、简体/繁体中文、日语、韩语、西班牙语、法语、德语、俄语、越南语、泰语、葡萄牙语、阿拉伯语（全选 / 清空），默认仍为英语 + 简体中文。
 - **Speed limit: number + unit.** Type just a number and pick KB/s or MB/s; empty = unlimited. Old values like 5M are converted.
@@ -8,8 +17,6 @@
   **组件区简化。** yt-dlp 和 ffmpeg 已内置，去掉「yt-dlp 路径」和「获取 ffmpeg」，改为显示 yt-dlp 版本和 ffmpeg 状态，保留「更新 yt-dlp」。
 - **Window and dialogs polish.** The Name column now fills the list width when you resize the window, status bar sections fit their text, Settings labels line up with their boxes, and the playlist prompt uses a plain row of buttons.
   **界面细节。** 缩放窗口时「名称」列自动填满宽度，状态栏各格按文字宽度显示完整，设置页标签与输入框对齐，播放列表询问弹窗改为底部一排按钮。
-
-### Earlier / 之前
 
 - **"Grab this page" on a single Xiaohongshu note now works.** It reads the note straight from the page you're looking at (including a note opened as a pop-up over the feed), falls back to the photos/video on screen, and says why when nothing was added (already in the list, or nothing readable). On other sites the button now shows a message instead of seeming to do nothing.
   **小红书单条笔记「抓取本页全部」修复。** 直接从当前页面读取笔记（包括在首页弹出的笔记），读不到时改用页面上显示的图片/视频；没加入任务时会说明原因（已在列表中或没读到内容）。在其他网站点击会弹出提示，不再像没反应。
