@@ -236,6 +236,7 @@ static const TrPair EN_TABLE[] = {
     { L"在这里登录网站后，下载时会自动使用登录状态（设置里 Cookies 选「内置浏览器」）", L"Sign in to sites here; downloads then use that sign-in (Settings: Cookies from built-in browser)" },
     { L"目前只能抓取小红书主页或笔记；其他网站登录后直接在主窗口粘贴链接即可", L"Grabbing works on Xiaohongshu profiles and notes; for other sites just sign in, then paste links in the main window" },
     { L"正在打开：", L"Opening: " },
+    { L"小红书网页版打不开这条笔记（可能已删除、仅 App 可见或需要登录）", L"The Xiaohongshu website can't open this note (deleted, app-only, or sign-in needed)" },
     { L"正在打开主页…", L"Opening the profile…" },
     { L"请先在这个窗口登录小红书，登录后会自动继续", L"Please sign in to Xiaohongshu in this window; grabbing continues automatically" },
     { L"小红书要求验证，暂停 60 秒后重试…", L"Xiaohongshu asked for verification; waiting 60 s before retrying…" },

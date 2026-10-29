@@ -35,6 +35,8 @@ static bool g_wvFailed = false;
 static std::wstring g_wvStartUrl;
 static std::vector<std::wstring> g_crawlQueue;
 static bool g_crawling = false, g_crawlPending = false;
+static std::wstring g_crawlUrl, g_crawlNoteUrl;   // what this crawl opened; the note page it reached
+static bool g_crawlLogin = false, g_crawlRetried = false;
 static int g_crawlAdded = 0;
 
 static std::wstring CookieFile() { return KnownFolder(FOLDERID_LocalAppData) + L"\\YtGrab\\cookies.txt"; }
@@ -273,6 +275,7 @@ static void NextCrawl() {
     std::wstring u = g_crawlQueue.front();
     g_crawlQueue.erase(g_crawlQueue.begin());
     g_crawling = true; g_crawlPending = true; g_crawlAdded = 0;
+    g_crawlUrl = u; g_crawlNoteUrl.clear(); g_crawlLogin = false; g_crawlRetried = false;
     BCrawlButton();
     BStatus(T(L"正在打开：") + u);
     BNavigate(u);
@@ -284,6 +287,59 @@ static std::wstring CurrentUrl() {
     LPWSTR p = nullptr;
     if (SUCCEEDED(g_wv->get_Source(&p)) && p) { s = p; CoTaskMemFree(p); }
     return s;
+}
+
+static bool XhsWorkPage(const std::wstring& l) {
+    return Has(l, L"xiaohongshu.com/") &&
+           (Has(l, L"/user/profile/") || Has(l, L"/explore/") || Has(l, L"/discovery/item/"));
+}
+
+// Follows the crawl through redirects: share links that land on the login page, sign-in that returns
+// to the home page instead of the note, and app share links the web version answers with a 404.
+static void CrawlFollow(const std::wstring& u, bool loaded) {
+    if (!g_crawling || !g_wv) return;
+    std::wstring l = Lower(u);
+    if (!Has(l, L"xiaohongshu.com")) return;
+    if (Has(l, L"xiaohongshu.com/login") || Has(l, L"/website-login")) {
+        if (!g_crawlLogin) {
+            g_crawlLogin = true;
+            BStatus(T(L"请先在这个窗口登录小红书，登录后会自动继续"));
+            if (IsIconic(g_hBrowser)) ShowWindow(g_hBrowser, SW_RESTORE);
+            ShowWindow(g_hBrowser, SW_SHOW);
+            SetForegroundWindow(g_hBrowser);
+        }
+        return;
+    }
+    if (XhsWorkPage(l)) {
+        if (Has(l, L"/discovery/item/") || (Has(l, L"/explore/") && Has(l, L"xsec_token"))) g_crawlNoteUrl = u;
+        if (loaded && g_crawlPending) {
+            g_crawlPending = false; g_crawlLogin = false;
+            g_wv->ExecuteScript(L"window.__ytgrabGo&&window.__ytgrabGo()", nullptr);
+        }
+        return;
+    }
+    if (!loaded || !g_crawlPending) return;
+    if (Has(l, L"/404") || Has(l, L"/error")) {
+        // The web version often refuses app share links: try the same note as a PC share once.
+        size_t a = g_crawlNoteUrl.find(L"/item/");
+        if (!g_crawlRetried && a != std::wstring::npos) {
+            g_crawlRetried = true;
+            std::wstring id = g_crawlNoteUrl.substr(a + 6, 24), tok;
+            size_t t = g_crawlNoteUrl.find(L"xsec_token=");
+            if (t != std::wstring::npos) tok = g_crawlNoteUrl.substr(t + 11, g_crawlNoteUrl.find(L'&', t) - t - 11);
+            BNavigate(L"https://www.xiaohongshu.com/explore/" + id + L"?xsec_token=" + tok + L"&xsec_source=pc_share");
+            return;
+        }
+        BStatus(T(L"小红书网页版打不开这条笔记（可能已删除、仅 App 可见或需要登录）"));
+        g_crawling = false; g_crawlPending = false;
+        BCrawlButton();
+        if (!g_crawlQueue.empty()) SetTimer(g_hBrowser, 2, 3000, nullptr);
+        return;
+    }
+    if (g_crawlLogin) {          // signed in, but Xiaohongshu went to its home page: open the link again
+        g_crawlLogin = false;
+        BNavigate(g_crawlNoteUrl.empty() ? g_crawlUrl : g_crawlNoteUrl);
+    }
 }
 
 static void StartCrawlHere() {
@@ -490,12 +546,16 @@ static void InitWebView(HWND hwnd) {
                             std::wstring u = CurrentUrl();
                             if (GetFocus() != g_hBAddr) SetWindowTextW(g_hBAddr, u.c_str());
                             SetTimer(g_hBrowser, 1, 1500, nullptr);          // export cookies shortly after
-                            std::wstring l = Lower(u);
-                            if (g_crawling && Has(l, L"xiaohongshu.com/") &&
-                                (Has(l, L"/user/profile/") || Has(l, L"/explore/") || Has(l, L"/discovery/item/"))) {
-                                g_crawlPending = false;
-                                g_wv->ExecuteScript(L"window.__ytgrabGo&&window.__ytgrabGo()", nullptr);
-                            }
+                            CrawlFollow(u, true);
+                            return S_OK;
+                        }), &tok);
+                    g_wv->add_SourceChanged(MakeH<ICoreWebView2SourceChangedEventHandler>(
+                        [](ICoreWebView2*, ICoreWebView2SourceChangedEventArgs* a) -> HRESULT {
+                            BOOL fresh = TRUE;
+                            if (a) a->get_IsNewDocument(&fresh);
+                            std::wstring u = CurrentUrl();
+                            if (GetFocus() != g_hBAddr) SetWindowTextW(g_hBAddr, u.c_str());
+                            CrawlFollow(u, !fresh);   // same-page route changes never fire NavigationCompleted
                             return S_OK;
                         }), &tok);
                     g_wv->add_DocumentTitleChanged(MakeH<ICoreWebView2DocumentTitleChangedEventHandler>(
@@ -550,6 +610,7 @@ static void OpenBrowser(const std::wstring& url, bool crawl) {
     ShowWindow(g_hBrowser, SW_SHOW);
     SetForegroundWindow(g_hBrowser);
     if (!g_wv) { if (!crawl) g_wvStartUrl = url; return; }   // still starting; picks it up when ready
-    if (crawl) { if (!g_crawling) NextCrawl(); }
+    // A crawl still waiting on its page (sign-in, a dead link) gives way to the link just pasted.
+    if (crawl) { if (!g_crawling || g_crawlPending) NextCrawl(); }
     else if (!url.empty()) BNavigate(url);
 }
