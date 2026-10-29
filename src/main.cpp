@@ -195,6 +195,7 @@ static const TrPair EN_TABLE[] = {
     { L"代理：", L"Proxy:" },
     { L"使用浏览器 Cookies：", L"Browser cookies:" },
     { L"组件", L"Components" },
+    { L"不限速", L"unlimited" },
     { L"未找到", L"not found" },
     { L"（内置）", L" (bundled)" },
     { L"未找到（合并高清需要）", L"not found (needed to merge HD)" },
@@ -1896,6 +1897,32 @@ static void ShowCompInfo(HWND d) {
     SetDlgItemTextW(d, IDC_FFINFO, f.c_str());
 }
 
+// Edit that takes a number with at most one decimal point (Settings > speed limit)
+static LRESULT CALLBACK NumberEditProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, UINT_PTR id, DWORD_PTR) {
+    if (msg == WM_CHAR && wp >= 32) {
+        if (iswdigit((wint_t)wp)) return DefSubclassProc(h, msg, wp, lp);
+        if (wp == L'.') {
+            wchar_t b[64]; GetWindowTextW(h, b, 64);
+            if (!wcschr(b, L'.')) return DefSubclassProc(h, msg, wp, lp);
+        }
+        MessageBeep(MB_OK);
+        return 0;
+    }
+    if (msg == WM_PASTE) {
+        if (OpenClipboard(h)) {
+            std::wstring t;
+            if (HANDLE hd = GetClipboardData(CF_UNICODETEXT)) { if (auto* p = (const wchar_t*)GlobalLock(hd)) { t = p; GlobalUnlock(hd); } }
+            CloseClipboard();
+            std::wstring keep; bool dot = false;
+            for (wchar_t c : t) if (iswdigit(c) || (c == L'.' && !dot)) { keep += c; if (c == L'.') dot = true; }
+            SendMessageW(h, EM_REPLACESEL, TRUE, (LPARAM)keep.c_str());
+        }
+        return 0;
+    }
+    if (msg == WM_NCDESTROY) RemoveWindowSubclass(h, NumberEditProc, id);
+    return DefSubclassProc(h, msg, wp, lp);
+}
+
 static std::wstring g_subLangsEdit;   // the choice while Settings is open
 
 static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
@@ -1951,9 +1978,24 @@ static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
             if (i && g_set.cookies == kBrowsers[i]) sel = i;
         }
         SendMessageW(c, CB_SETCURSEL, sel, 0);
-        SetDlgItemTextW(d, IDC_RATE, g_set.rate.c_str());
+        {   // "5M" / "500K" / "1.5M" -> number + unit
+            std::wstring r = Trim(g_set.rate), num; int unit = 1;
+            size_t k = 0;
+            while (k < r.size() && (iswdigit(r[k]) || r[k] == L'.')) num += r[k++];
+            wchar_t u = k < r.size() ? (wchar_t)towupper(r[k]) : 0;
+            if (u == L'K') unit = 0;
+            else if (u == 0 && !num.empty()) {          // plain bytes per second
+                double v = _wtof(num.c_str()) / 1024.0; unit = 0;
+                wchar_t b[32]; swprintf(b, 32, L"%.0f", v < 1 ? 1.0 : v); num = b;
+            }
+            SetDlgItemTextW(d, IDC_RATE, num.c_str());
+            SendDlgItemMessageW(d, IDC_RATEUNIT, CB_ADDSTRING, 0, (LPARAM)L"KB/s");
+            SendDlgItemMessageW(d, IDC_RATEUNIT, CB_ADDSTRING, 0, (LPARAM)L"MB/s");
+            SendDlgItemMessageW(d, IDC_RATEUNIT, CB_SETCURSEL, unit, 0);
+            SetWindowSubclass(GetDlgItem(d, IDC_RATE), NumberEditProc, 1, 0);
+        }
         SetDlgItemTextW(d, IDC_PROXY, g_set.proxy.c_str());
-        SendDlgItemMessageW(d, IDC_RATE, EM_SETCUEBANNER, TRUE, (LPARAM)T(L"例如 5M，留空不限速"));
+        SendDlgItemMessageW(d, IDC_RATE, EM_SETCUEBANNER, TRUE, (LPARAM)T(L"不限速"));
         SendDlgItemMessageW(d, IDC_PROXY, EM_SETCUEBANNER, TRUE, (LPARAM)T(L"例如 http://127.0.0.1:7890"));
         CheckDlgButton(d, IDC_SUBS, g_set.subs ? BST_CHECKED : BST_UNCHECKED);
         g_subLangsEdit = g_set.subLangs;
@@ -1981,7 +2023,13 @@ static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
             int ck = (int)SendDlgItemMessageW(d, IDC_COOKIES, CB_GETCURSEL, 0, 0);
             g_set.cookies = ck > 0 ? kBrowsers[ck] : L"";
             wchar_t b[2048];
-            GetDlgItemTextW(d, IDC_RATE, b, 2048);   g_set.rate = Trim(b);
+            GetDlgItemTextW(d, IDC_RATE, b, 2048);
+            {
+                std::wstring num = Trim(b);
+                while (!num.empty() && num.back() == L'.') num.pop_back();
+                bool kb = SendDlgItemMessageW(d, IDC_RATEUNIT, CB_GETCURSEL, 0, 0) == 0;
+                g_set.rate = (num.empty() || _wtof(num.c_str()) <= 0) ? L"" : num + (kb ? L"K" : L"M");
+            }
             GetDlgItemTextW(d, IDC_PROXY, b, 2048);  g_set.proxy = Trim(b);
             g_set.subs = IsDlgButtonChecked(d, IDC_SUBS) == BST_CHECKED;
             g_set.subLangs = g_subLangsEdit;
