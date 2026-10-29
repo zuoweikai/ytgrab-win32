@@ -195,6 +195,7 @@ static const TrPair EN_TABLE[] = {
     { L"代理：", L"Proxy:" },
     { L"使用浏览器 Cookies：", L"Browser cookies:" },
     { L"组件", L"Components" },
+    { L"要下载哪些内容？", L"What do you want to download?" },
     { L"不限速", L"unlimited" },
     { L"未找到", L"not found" },
     { L"（内置）", L" (bundled)" },
@@ -1392,27 +1393,68 @@ static bool IsVideoInList(const std::wstring& u) {
 }
 
 enum { ID_PL_ONE = 101, ID_PL_ALL = 102 };
-static int AskPlaylist() {
-    TASKDIALOG_BUTTON btns[] = {
-        { ID_PL_ONE, T(L"只下载当前视频") },
-        { ID_PL_ALL, T(L"下载整个播放列表") },
-    };
-    TASKDIALOGCONFIG c{ sizeof(c) };
-    c.hwndParent = g_hwnd;
-    c.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW;
-    c.dwCommonButtons = TDCBF_CANCEL_BUTTON;
-    c.pszWindowTitle = T(kAppName);
-    c.pszMainIcon = TD_INFORMATION_ICON;
-    c.pszMainInstruction = T(L"这个链接属于一个播放列表");
-    c.pszContent = T(L"要只下载当前这个视频，还是下载整个播放列表？");
-    c.cButtons = 2; c.pButtons = btns; c.nDefaultButton = ID_PL_ONE;
-    int r = IDCANCEL;
-    if (FAILED(TaskDialogIndirect(&c, &r, nullptr, nullptr))) {
-        int m = MessageBoxW(g_hwnd, T(L"这个链接属于一个播放列表。\n\n是：只下载当前视频\n否：下载整个播放列表"),
-                            T(kAppName), MB_YESNOCANCEL | MB_ICONQUESTION);
-        r = m == IDYES ? ID_PL_ONE : m == IDNO ? ID_PL_ALL : IDCANCEL;
+// "This link is part of a playlist": custom panel (bold heading, two choices, blue OK)
+static INT_PTR CALLBACK PlaylistProc(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
+    static HFONT head;
+    switch (msg) {
+    case WM_INITDIALOG: {
+        wchar_t b[256];
+        for (int id : { IDC_PL_HEAD, IDC_PL_BODY, IDC_PL_ONE, IDC_PL_ALL, IDOK, IDCANCEL }) {
+            GetDlgItemTextW(d, id, b, 256); SetDlgItemTextW(d, id, T(b));
+        }
+        LOGFONTW lf{};
+        GetObjectW((HFONT)SendMessageW(d, WM_GETFONT, 0, 0), sizeof(lf), &lf);
+        lf.lfWeight = FW_SEMIBOLD; lf.lfHeight = lf.lfHeight * 13 / 10;
+        head = CreateFontIndirectW(&lf);
+        SendDlgItemMessageW(d, IDC_PL_HEAD, WM_SETFONT, (WPARAM)head, TRUE);
+        CheckRadioButton(d, IDC_PL_ONE, IDC_PL_ALL, IDC_PL_ONE);
+        DWORD corner = 2;   // DWMWCP_ROUND (Windows 11)
+        DwmSetWindowAttribute(d, 33 /*DWMWA_WINDOW_CORNER_PREFERENCE*/, &corner, sizeof(corner));
+        // centre over the main window
+        RECT rp, rd; GetWindowRect(g_hwnd, &rp); GetWindowRect(d, &rd);
+        SetWindowPos(d, nullptr, rp.left + ((rp.right - rp.left) - (rd.right - rd.left)) / 2,
+                     rp.top + ((rp.bottom - rp.top) - (rd.bottom - rd.top)) / 2, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        SetFocus(GetDlgItem(d, IDC_PL_ONE));
+        return FALSE;
     }
-    return r;
+    case WM_DRAWITEM: {
+        auto* di = (DRAWITEMSTRUCT*)lp;
+        if (di->CtlID != IDOK) break;
+        bool down = di->itemState & ODS_SELECTED, focus = di->itemState & ODS_FOCUS;
+        COLORREF fill = down ? RGB(0, 84, 158) : RGB(0, 103, 192);
+        FillRect(di->hDC, &di->rcItem, GetSysColorBrush(COLOR_BTNFACE));
+        HBRUSH br = CreateSolidBrush(fill);
+        HPEN pen = CreatePen(PS_SOLID, 1, fill);
+        HGDIOBJ ob = SelectObject(di->hDC, br), op = SelectObject(di->hDC, pen);
+        int r = S(6);
+        RoundRect(di->hDC, di->rcItem.left, di->rcItem.top, di->rcItem.right, di->rcItem.bottom, r, r);
+        SelectObject(di->hDC, ob); SelectObject(di->hDC, op); DeleteObject(br); DeleteObject(pen);
+        wchar_t t[64]; GetWindowTextW(di->hwndItem, t, 64);
+        SetBkMode(di->hDC, TRANSPARENT); SetTextColor(di->hDC, RGB(255, 255, 255));
+        HGDIOBJ of = SelectObject(di->hDC, (HFONT)SendMessageW(d, WM_GETFONT, 0, 0));
+        DrawTextW(di->hDC, t, -1, &di->rcItem, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        SelectObject(di->hDC, of);
+        if (focus && !(di->itemState & ODS_NOFOCUSRECT)) {
+            RECT fr = di->rcItem; InflateRect(&fr, -S(3), -S(3)); SetTextColor(di->hDC, RGB(255, 255, 255)); DrawFocusRect(di->hDC, &fr);
+        }
+        return TRUE;
+    }
+    case WM_LBUTTONDOWN:   // no title bar: drag anywhere on the panel
+        ReleaseCapture(); SendMessageW(d, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+        return TRUE;
+    case WM_COMMAND:
+        if (LOWORD(wp) == IDOK) { EndDialog(d, IsDlgButtonChecked(d, IDC_PL_ALL) == BST_CHECKED ? ID_PL_ALL : ID_PL_ONE); return TRUE; }
+        if (LOWORD(wp) == IDCANCEL) { EndDialog(d, IDCANCEL); return TRUE; }
+        break;
+    case WM_DESTROY:
+        if (head) { DeleteObject(head); head = nullptr; }
+        break;
+    }
+    return FALSE;
+}
+
+static int AskPlaylist() {
+    return (int)DialogBoxParamW(g_hInst, MAKEINTRESOURCEW(IDD_PLAYLIST), g_hwnd, PlaylistProc, 0);
 }
 
 static void PumpOrPrompt() { if (g_ytdlp.empty()) PromptYtdlp(); else Pump(); }

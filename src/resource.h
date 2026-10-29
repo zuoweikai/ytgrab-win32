@@ -17,6 +17,11 @@
 #define IDC_SUBLANGS    1014
 #define IDC_YTVER       1016
 #define IDC_RATEUNIT    1018
+#define IDD_PLAYLIST    102
+#define IDC_PL_HEAD     1130
+#define IDC_PL_BODY     1131
+#define IDC_PL_ONE      1132
+#define IDC_PL_ALL      1133
 #define IDC_FFINFO      1017
 #define IDD_SUBLANGS    101
 #define IDC_SL_FIRST    1101
