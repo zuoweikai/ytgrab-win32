@@ -1,10 +1,18 @@
 ## What's new / 更新内容
 
-- **"Grab this page" on a single Xiaohongshu note now works.** It reads the note straight from the page you're looking at (including a note opened as a pop-up over the feed), falls back to the photos/video on screen, and says why when nothing was added (already in the list, or nothing readable). On other sites the button now shows a message instead of seeming to do nothing.
-  **小红书单条笔记「抓取本页全部」修复。** 直接从当前页面读取笔记（包括在首页弹出的笔记），读不到时改用页面上显示的图片/视频；没加入任务时会说明原因（已在列表中或没读到内容）。在其他网站点击会弹出提示，不再像没反应。
+- **Subtitles in 13 languages.** Settings > Subtitles now has a **Languages…** button: pick any of English, Simplified/Traditional Chinese, Japanese, Korean, Spanish, French, German, Russian, Vietnamese, Thai, Portuguese, Arabic (Select all / Clear). Default stays English + Simplified Chinese.
+  **字幕支持 13 种语言。** 设置里「下载字幕」旁新增「字幕语言…」按钮，可多选英语、简体/繁体中文、日语、韩语、西班牙语、法语、德语、俄语、越南语、泰语、葡萄牙语、阿拉伯语（全选 / 清空），默认仍为英语 + 简体中文。
+- **Speed limit: number + unit.** Type just a number and pick KB/s or MB/s; empty = unlimited. Old values like 5M are converted.
+  **限速改为「数字 + 单位」。** 只填数字，后面选 KB/s 或 MB/s，留空不限速；以前填的 5M 等会自动转换。
+- **Components section simplified.** yt-dlp and ffmpeg ship with YtGrab, so the yt-dlp path box and Get ffmpeg button are gone; it shows the yt-dlp version and ffmpeg status, and keeps **Update yt-dlp**.
+  **组件区简化。** yt-dlp 和 ffmpeg 已内置，去掉「yt-dlp 路径」和「获取 ffmpeg」，改为显示 yt-dlp 版本和 ffmpeg 状态，保留「更新 yt-dlp」。
+- **Window and dialogs polish.** The Name column now fills the list width when you resize the window, status bar sections fit their text, Settings labels line up with their boxes, and the playlist prompt uses a plain row of buttons.
+  **界面细节。** 缩放窗口时「名称」列自动填满宽度，状态栏各格按文字宽度显示完整，设置页标签与输入框对齐，播放列表询问弹窗改为底部一排按钮。
 
 ### Earlier / 之前
 
+- **"Grab this page" on a single Xiaohongshu note now works.** It reads the note straight from the page you're looking at (including a note opened as a pop-up over the feed), falls back to the photos/video on screen, and says why when nothing was added (already in the list, or nothing readable). On other sites the button now shows a message instead of seeming to do nothing.
+  **小红书单条笔记「抓取本页全部」修复。** 直接从当前页面读取笔记（包括在首页弹出的笔记），读不到时改用页面上显示的图片/视频；没加入任务时会说明原因（已在列表中或没读到内容）。在其他网站点击会弹出提示，不再像没反应。
 - **Built-in browser (WebView2).** New **Sign in…** button: sign in to any site (YouTube, Bilibili, Douyin, Instagram, members-only content…) once inside YtGrab, and downloads use that sign-in automatically. This also works when Chrome/Edge cookies can't be read. Settings > Cookies from now defaults to **Built-in browser**. A failed download that needs a sign-in says so; right-click > **Sign in with built-in browser** opens that site.
   **内置浏览器（WebView2）。** 新增「登录网站…」按钮：在 YtGrab 里登录任意网站（YouTube、B 站、抖音、Instagram、会员内容等）一次，之后下载自动带上登录状态，Chrome/Edge 的 Cookies 读不出来也没关系。设置里「Cookies 来源」默认改为「内置浏览器」。需要登录而失败的任务会提示，右键「在内置浏览器中登录」直接打开该网站。
 - **Xiaohongshu home pages, every note.** Paste a Xiaohongshu profile or share link (xhslink) and the built-in browser opens it, asks you to sign in the first time, then scrolls the page slowly at an uneven, human pace and reads each note one by one with pauses. Videos and image notes (all pictures, Live Photos too) are saved to `<save folder>\<creator>`. Single note links work too, including image notes. Large profiles take a while on purpose; Xiaohongshu may still ask for verification, in which case it waits and retries.
