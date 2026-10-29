@@ -15,6 +15,8 @@
 #define IDC_COMPINFO    1012
 #define IDC_LANG        1013
 #define IDC_SUBLANGS    1014
+#define IDC_YTVER       1016
+#define IDC_FFINFO      1017
 #define IDD_SUBLANGS    101
 #define IDC_SL_FIRST    1101
 #define IDC_SL_ALL      1120

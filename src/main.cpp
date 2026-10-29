@@ -195,6 +195,11 @@ static const TrPair EN_TABLE[] = {
     { L"代理：", L"Proxy:" },
     { L"使用浏览器 Cookies：", L"Browser cookies:" },
     { L"组件", L"Components" },
+    { L"未找到", L"not found" },
+    { L"（内置）", L" (bundled)" },
+    { L"未找到（合并高清需要）", L"not found (needed to merge HD)" },
+    { L"已就绪", L"ready" },
+    { L"网站常变，下载失败时先点这个", L"Sites change often; try this first if downloads fail" },
     { L"yt-dlp 路径：", L"yt-dlp path:" },
     { L"更新 yt-dlp", L"Update yt-dlp" },
     { L"下载 ffmpeg", L"Get ffmpeg" },
@@ -1839,6 +1844,20 @@ static INT_PTR CALLBACK SubLangsProc(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
     return FALSE;
 }
 
+// Settings > Components: version / status of the bundled tools
+static void ShowCompInfo(HWND d) {
+    auto bundled = [](const std::wstring& p) {
+        std::wstring t = ExeDir() + L"\\tools\\";
+        return !p.empty() && _wcsnicmp(p.c_str(), t.c_str(), t.size()) == 0;
+    };
+    std::wstring y = g_ytdlp.empty() ? T(L"未找到") : (g_ytdlpVer.empty() ? std::wstring(L"…") : g_ytdlpVer);
+    if (!g_ytdlp.empty() && bundled(g_ytdlp)) y += T(L"（内置）");
+    std::wstring f = g_ffmpeg.empty() ? T(L"未找到（合并高清需要）") : std::wstring(T(L"已就绪"));
+    if (!g_ffmpeg.empty() && bundled(g_ffmpeg)) f += T(L"（内置）");
+    SetDlgItemTextW(d, IDC_YTVER, y.c_str());
+    SetDlgItemTextW(d, IDC_FFINFO, f.c_str());
+}
+
 static std::wstring g_subLangsEdit;   // the choice while Settings is open
 
 static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
@@ -1859,7 +1878,8 @@ static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
                 HWND dlg = (HWND)lp;
                 wchar_t cls[32];
                 GetClassNameW(h, cls, 32);
-                if (_wcsicmp(cls, L"Static") || GetDlgCtrlID(h) == IDC_COMPINFO) return TRUE;
+                int cid = GetDlgCtrlID(h);
+                if (_wcsicmp(cls, L"Static") || cid == IDC_COMPINFO || cid == IDC_YTVER || cid == IDC_FFINFO) return TRUE;
                 RECT rl; GetWindowRect(h, &rl); MapWindowPoints(nullptr, dlg, (POINT*)&rl, 2);
                 HWND best = nullptr; RECT rb{}; int bestDx = 1 << 30;
                 for (HWND c = GetWindow(dlg, GW_CHILD); c; c = GetWindow(c, GW_HWNDNEXT)) {
@@ -1895,15 +1915,14 @@ static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
         SendMessageW(c, CB_SETCURSEL, sel, 0);
         SetDlgItemTextW(d, IDC_RATE, g_set.rate.c_str());
         SetDlgItemTextW(d, IDC_PROXY, g_set.proxy.c_str());
-        SetDlgItemTextW(d, IDC_YTPATH, g_set.ytdlpPath.c_str());
         SendDlgItemMessageW(d, IDC_RATE, EM_SETCUEBANNER, TRUE, (LPARAM)T(L"例如 5M，留空不限速"));
         SendDlgItemMessageW(d, IDC_PROXY, EM_SETCUEBANNER, TRUE, (LPARAM)T(L"例如 http://127.0.0.1:7890"));
-        SendDlgItemMessageW(d, IDC_YTPATH, EM_SETCUEBANNER, TRUE, (LPARAM)T(L"留空自动查找"));
         CheckDlgButton(d, IDC_SUBS, g_set.subs ? BST_CHECKED : BST_UNCHECKED);
         g_subLangsEdit = g_set.subLangs;
         EnableWindow(GetDlgItem(d, IDC_SUBLANGS), g_set.subs);
         CheckDlgButton(d, IDC_THUMB, g_set.thumb ? BST_CHECKED : BST_UNCHECKED);
-        SetDlgItemTextW(d, IDC_COMPINFO, g_ffmpeg.empty() ? T(L"ffmpeg 未安装（合并高清需要）") : T(L"ffmpeg 已就绪"));
+        ShowCompInfo(d);
+        SetDlgItemTextW(d, IDC_COMPINFO, T(L"网站常变，下载失败时先点这个"));
         return TRUE;
     }
     case WM_COMMAND:
@@ -1914,21 +1933,9 @@ static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
         case IDC_SUBLANGS:
             DialogBoxParamW(g_hInst, MAKEINTRESOURCEW(IDD_SUBLANGS), d, SubLangsProc, (LPARAM)&g_subLangsEdit);
             return TRUE;
-        case IDC_YTBROWSE: {
-            wchar_t file[MAX_PATH] = L"";
-            OPENFILENAMEW of{}; of.lStructSize = sizeof(of); of.hwndOwner = d;
-            of.lpstrFilter = L"yt-dlp (*.exe)\0*.exe\0"; of.lpstrFile = file; of.nMaxFile = MAX_PATH;
-            of.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_EXPLORER;
-            if (GetOpenFileNameW(&of)) SetDlgItemTextW(d, IDC_YTPATH, file);
-            return TRUE;
-        }
         case IDC_UPDATE:
             StartComponent(ID_UPDATE_YTDLP);
             SetDlgItemTextW(d, IDC_COMPINFO, T(L"进度见主窗口状态栏"));
-            return TRUE;
-        case IDC_GETFF:
-            StartComponent(ID_GET_FFMPEG);
-            SetDlgItemTextW(d, IDC_COMPINFO, T(L"约 200 MB，进度见状态栏"));
             return TRUE;
         case IDOK: {
             g_set.conc = (int)SendDlgItemMessageW(d, IDC_CONC, CB_GETCURSEL, 0, 0) + 1;
@@ -1938,7 +1945,6 @@ static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
             wchar_t b[2048];
             GetDlgItemTextW(d, IDC_RATE, b, 2048);   g_set.rate = Trim(b);
             GetDlgItemTextW(d, IDC_PROXY, b, 2048);  g_set.proxy = Trim(b);
-            GetDlgItemTextW(d, IDC_YTPATH, b, 2048); g_set.ytdlpPath = Trim(b);
             g_set.subs = IsDlgButtonChecked(d, IDC_SUBS) == BST_CHECKED;
             g_set.subLangs = g_subLangsEdit;
             g_set.thumb = IsDlgButtonChecked(d, IDC_THUMB) == BST_CHECKED;
@@ -2327,6 +2333,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         std::unique_ptr<std::wstring> v((std::wstring*)lp);
         g_ytdlpVer = *v;
         UpdateToolStatus();
+        if (g_hSettingsDlg) ShowCompInfo(g_hSettingsDlg);
         return 0;
     }
     case WM_APP_COMP: {
@@ -2337,6 +2344,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             g_compBusy = false;
             DetectTools();
             UpdateToolStatus();
+            if (g_hSettingsDlg) ShowCompInfo(g_hSettingsDlg);
             if (g_hSettingsDlg)
                 SetDlgItemTextW(g_hSettingsDlg, IDC_COMPINFO, wp == 1 ? T(L"完成") : T(L"失败，详见状态栏"));
             if (wp == 2) MessageBoxW(g_hSettingsDlg ? g_hSettingsDlg : hwnd, m->c_str(), T(kAppName), MB_OK | MB_ICONWARNING);

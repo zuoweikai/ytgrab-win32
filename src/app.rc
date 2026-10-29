@@ -30,12 +30,12 @@ BEGIN
     COMBOBOX        IDC_COOKIES, 110, 139, 130, 160, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
     GROUPBOX        "组件", -1, 7, 163, 286, 62
-    LTEXT           "yt-dlp 路径：", -1, 15, 179, 90, 9
-    EDITTEXT        IDC_YTPATH, 110, 177, 128, 13, ES_AUTOHSCROLL
-    PUSHBUTTON      "浏览…", IDC_YTBROWSE, 242, 176, 44, 15
-    PUSHBUTTON      "更新 yt-dlp", IDC_UPDATE, 15, 199, 70, 15
-    PUSHBUTTON      "下载 ffmpeg", IDC_GETFF, 90, 199, 70, 15
-    LTEXT           "", IDC_COMPINFO, 166, 202, 122, 9
+    LTEXT           "yt-dlp", -1, 15, 177, 45, 9
+    LTEXT           "", IDC_YTVER, 64, 177, 222, 9
+    LTEXT           "ffmpeg", -1, 15, 189, 45, 9
+    LTEXT           "", IDC_FFINFO, 64, 189, 222, 9
+    PUSHBUTTON      "更新 yt-dlp", IDC_UPDATE, 15, 203, 70, 15
+    LTEXT           "", IDC_COMPINFO, 92, 206, 195, 9
 
     LTEXT           "界面语言：", -1, 9, 232, 50, 9
     COMBOBOX        IDC_LANG, 60, 230, 80, 80, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
