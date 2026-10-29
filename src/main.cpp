@@ -403,6 +403,9 @@ struct Settings {
     int x = CW_USEDEFAULT, y = CW_USEDEFAULT, w = 0, h = 0; bool maximized = false;
 };
 static Settings g_set;
+// Column widths the user dragged, in 96-dpi pixels. Once set, the name column stops filling the window.
+static int g_colW[7] = {};
+static bool g_colsUser = false;
 static std::wstring g_ini;
 
 static void IniPath() {
@@ -441,6 +444,15 @@ static void LoadSettings() {
     g_set.w = IniInt(L"WinW", 0); g_set.h = IniInt(L"WinH", 0);
     g_set.maximized = IniInt(L"WinMax", 0) != 0;
     g_set.lang = std::max(0, std::min(2, IniInt(L"Language", 0)));
+    {
+        std::wstring cw = IniStr(L"ColWidths"); int n = 0; size_t a = 0;
+        while (n < 7 && a < cw.size()) {
+            size_t b = cw.find(L',', a); if (b == std::wstring::npos) b = cw.size();
+            g_colW[n++] = std::max(30, std::min(3000, _wtoi(cw.substr(a, b - a).c_str())));
+            a = b + 1;
+        }
+        g_colsUser = n == 7;
+    }
     g_en = g_set.lang == 2 || (g_set.lang == 0 && PRIMARYLANGID(GetUserDefaultUILanguage()) != LANG_CHINESE);
 }
 static void SaveSettings() {
@@ -537,6 +549,7 @@ static const wchar_t* kColName[] = { L"名称", L"状态", L"进度", L"大小",
 static const int kCols = 7;
 
 static int S(int v) { return MulDiv(v, (int)g_dpi, 96); }
+static int ColW(int i) { return S(g_colsUser && g_colW[i] > 0 ? g_colW[i] : kColW[i]); }
 
 // ---------------------------------------------------------------------------
 // Child process with private pipe + kill-on-close job object
@@ -1317,7 +1330,7 @@ static void UpdateRowHeight() {
 
 static void FitNameColumn();
 static void UpdateColumns() {
-    for (int i = 0; i < kCols; ++i) ListView_SetColumnWidth(g_hList, i, S(kColW[i]));
+    for (int i = 0; i < kCols; ++i) ListView_SetColumnWidth(g_hList, i, ColW(i));
     FitNameColumn();
 }
 
@@ -1344,7 +1357,7 @@ static void FitStatusParts() {
 
 // Name column takes the width the other columns leave
 static void FitNameColumn() {
-    if (!g_hList) return;
+    if (!g_hList || g_colsUser) return;   // the user set the widths: leave them alone
     RECT rc; GetClientRect(g_hList, &rc);
     int others = 0;
     for (int i = 1; i < kCols; ++i) others += ListView_GetColumnWidth(g_hList, i);
@@ -2307,7 +2320,7 @@ static void OnCreate(HWND hwnd) {
     for (int i = 0; i < kCols; ++i) {
         LVCOLUMNW c{}; c.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT;
         c.fmt = (i >= 3 && i <= 5) ? LVCFMT_RIGHT : LVCFMT_LEFT;
-        c.cx = S(kColW[i]); c.pszText = (LPWSTR)T(kColName[i]);
+        c.cx = ColW(i); c.pszText = (LPWSTR)T(kColName[i]);
         ListView_InsertColumn(g_hList, i, &c);
     }
     UpdateRowHeight();
@@ -2479,6 +2492,18 @@ static void OnCommand(HWND hwnd, int id, int code) {
 }
 
 static LRESULT OnNotify(NMHDR* nh) {
+    if (g_hList && nh->hwndFrom == ListView_GetHeader(g_hList)) {
+        switch (nh->code) {
+        case HDN_BEGINTRACKW: case HDN_BEGINTRACKA:
+            g_colsUser = true;            // stop auto-fitting before the drag starts, or the two fight
+            break;
+        case HDN_ENDTRACKW: case HDN_ENDTRACKA: case HDN_DIVIDERDBLCLICKW: case HDN_DIVIDERDBLCLICKA:
+            g_colsUser = true;
+            SetTimer(g_hwnd, 3, 50, nullptr);   // read the widths once the header has applied them
+            break;
+        }
+        return 0;
+    }
     if (nh->hwndFrom != g_hList) return 0;
     switch (nh->code) {
     case LVN_GETDISPINFOW:
@@ -2572,6 +2597,16 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         break;
     case WM_TIMER:
         if (wp == 2) { KillTimer(hwnd, 2); SetWindowTextW(g_hAdd, T(L"解析并下载")); return 0; }
+        if (wp == 3) {
+            KillTimer(hwnd, 3);
+            std::wstring v;
+            for (int i = 0; i < kCols; ++i) {
+                g_colW[i] = std::max(30, MulDiv(ListView_GetColumnWidth(g_hList, i), 96, (int)g_dpi));
+                v += (i ? L"," : L"") + std::to_wstring(g_colW[i]);
+            }
+            IniPut(L"ColWidths", v);
+            return 0;
+        }
         OnTimer();
         return 0;
     case WM_APP_EXPANDED:
