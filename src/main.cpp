@@ -1993,6 +1993,12 @@ static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
             SendDlgItemMessageW(d, IDC_RATEUNIT, CB_ADDSTRING, 0, (LPARAM)L"MB/s");
             SendDlgItemMessageW(d, IDC_RATEUNIT, CB_SETCURSEL, unit, 0);
             SetWindowSubclass(GetDlgItem(d, IDC_RATE), NumberEditProc, 1, 0);
+            {   // same top and height as the unit drop-down beside it
+                RECT re, ru; HWND he = GetDlgItem(d, IDC_RATE), hu = GetDlgItem(d, IDC_RATEUNIT);
+                GetWindowRect(he, &re); GetWindowRect(hu, &ru);
+                MapWindowPoints(nullptr, d, (POINT*)&re, 2); MapWindowPoints(nullptr, d, (POINT*)&ru, 2);
+                SetWindowPos(he, nullptr, re.left, ru.top, re.right - re.left, ru.bottom - ru.top, SWP_NOZORDER | SWP_NOACTIVATE);
+            }
         }
         SetDlgItemTextW(d, IDC_PROXY, g_set.proxy.c_str());
         SendDlgItemMessageW(d, IDC_RATE, EM_SETCUEBANNER, TRUE, (LPARAM)T(L"不限速"));
