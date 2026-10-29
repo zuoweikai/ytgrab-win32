@@ -1202,7 +1202,7 @@ static void ComponentThread(int which) {
 }
 
 static void StartComponent(int which) {
-    if (g_compBusy) { MessageBeep(MB_ICONWARNING); return; }
+    if (g_compBusy) return;
     g_compBusy = true;
     std::thread(ComponentThread, which).detach();
 }
@@ -1496,7 +1496,6 @@ static void StopAll() {
 static void AddFromText(const std::wstring& text) {
     auto urls = ExtractUrls(text);
     if (urls.empty()) {
-        MessageBeep(MB_ICONWARNING);
         g_statusMsg = T(L"没有识别到 http/https 链接");
         SetStatusPart(0, g_statusMsg);
         return;
@@ -1548,7 +1547,7 @@ static void AddFromText(const std::wstring& text) {
     SetStatusPart(0, g_statusMsg);
     SetWindowTextW(g_hAdd, added ? T(L"✓ 已添加") : T(L"已在列表中"));
     SetTimer(g_hwnd, 2, 1500, nullptr);
-    if (!added) { MessageBeep(MB_ICONINFORMATION); return; }
+    if (!added) return;
     if (g_ytdlp.empty()) PromptYtdlp(); else Pump();
 }
 
@@ -1947,7 +1946,6 @@ static LRESULT CALLBACK NumberEditProc(HWND h, UINT msg, WPARAM wp, LPARAM lp, U
             wchar_t b[64]; GetWindowTextW(h, b, 64);
             if (!wcschr(b, L'.')) return DefSubclassProc(h, msg, wp, lp);
         }
-        MessageBeep(MB_OK);
         return 0;
     }
     if (msg == WM_PASTE) {
