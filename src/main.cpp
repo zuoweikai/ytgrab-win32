@@ -1318,7 +1318,7 @@ static int AskPlaylist() {
     };
     TASKDIALOGCONFIG c{ sizeof(c) };
     c.hwndParent = g_hwnd;
-    c.dwFlags = TDF_USE_COMMAND_LINKS | TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW;
+    c.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW;
     c.dwCommonButtons = TDCBF_CANCEL_BUTTON;
     c.pszWindowTitle = T(kAppName);
     c.pszMainIcon = TD_INFORMATION_ICON;
