@@ -195,6 +195,16 @@ static const TrPair EN_TABLE[] = {
     { L"代理：", L"Proxy:" },
     { L"使用浏览器 Cookies：", L"Browser cookies:" },
     { L"组件", L"Components" },
+    { L"没有找到 yt-dlp", L"yt-dlp was not found" },
+    { L"要现在从 GitHub 下载最新版吗（约 18 MB）？也可以手动把 yt-dlp.exe 放在本程序同一目录下。", L"Download the latest version from GitHub now (about 18 MB)? You can also put yt-dlp.exe in the same folder as this program." },
+    { L"立即下载", L"Download" },
+    { L"删除 ", L"Delete " },
+    { L" 个文件？", L" file(s)?" },
+    { L"文件会移到回收站，这些任务也会从列表中移除。", L"They go to the Recycle Bin, and the tasks are removed from the list." },
+    { L" 个任务正在下载", L" download(s) still running" },
+    { L"退出会暂停它们，下次打开后点「开始全部」继续。", L"Quitting pauses them. Click \"Start all\" next time to resume." },
+    { L"退出", L"Quit" },
+    { L"操作没有完成", L"That didn't finish" },
     { L"要下载哪些内容？", L"What do you want to download?" },
     { L"不限速", L"unlimited" },
     { L"未找到", L"not found" },
@@ -1381,9 +1391,10 @@ static void RefreshListCount() {
 
 static void PromptYtdlp() {
     if (g_compBusy) return;
-    int r = MessageBoxW(g_hwnd, T(L"没有找到 yt-dlp.exe。\n\n是否现在从 GitHub 自动下载最新版（约 18 MB）？\n也可以手动把 yt-dlp.exe 放在本程序同一目录下。"),
-                        T(kAppName), MB_YESNO | MB_ICONQUESTION);
-    if (r == IDYES) StartComponent(ID_GET_YTDLP);
+    if (Ask(g_hwnd, T(L"没有找到 yt-dlp"),
+            T(L"要现在从 GitHub 下载最新版吗（约 18 MB）？也可以手动把 yt-dlp.exe 放在本程序同一目录下。"),
+            T(L"立即下载"), T(L"取消")))
+        StartComponent(ID_GET_YTDLP);
 }
 
 // A single video link that also carries a playlist (YouTube watch?v=…&list=…, youtu.be/…?list=…).
@@ -1393,6 +1404,117 @@ static bool IsVideoInList(const std::wstring& u) {
 }
 
 enum { ID_PL_ONE = 101, ID_PL_ALL = 102 };
+// Shared look for our silent panels (no system sound, no title bar).
+static void DrawPrimaryBtn(HWND d, const DRAWITEMSTRUCT* di, bool danger) {
+    bool down = di->itemState & ODS_SELECTED, focus = di->itemState & ODS_FOCUS;
+    COLORREF fill = danger ? (down ? RGB(160, 32, 20) : RGB(196, 43, 28))
+                           : (down ? RGB(0, 84, 158) : RGB(0, 103, 192));
+    FillRect(di->hDC, &di->rcItem, GetSysColorBrush(COLOR_BTNFACE));
+    HBRUSH br = CreateSolidBrush(fill);
+    HPEN pen = CreatePen(PS_SOLID, 1, fill);
+    HGDIOBJ ob = SelectObject(di->hDC, br), op = SelectObject(di->hDC, pen);
+    int r = S(6);
+    RoundRect(di->hDC, di->rcItem.left, di->rcItem.top, di->rcItem.right, di->rcItem.bottom, r, r);
+    SelectObject(di->hDC, ob); SelectObject(di->hDC, op); DeleteObject(br); DeleteObject(pen);
+    wchar_t t[64]; GetWindowTextW(di->hwndItem, t, 64);
+    SetBkMode(di->hDC, TRANSPARENT); SetTextColor(di->hDC, RGB(255, 255, 255));
+    HGDIOBJ of = SelectObject(di->hDC, (HFONT)SendMessageW(d, WM_GETFONT, 0, 0));
+    RECT rc = di->rcItem;
+    DrawTextW(di->hDC, t, -1, &rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    SelectObject(di->hDC, of);
+    if (focus && !(di->itemState & ODS_NOFOCUSRECT)) {
+        RECT fr = di->rcItem; InflateRect(&fr, -S(3), -S(3)); DrawFocusRect(di->hDC, &fr);
+    }
+}
+static HFONT MakeHeadFont(HWND d) {
+    LOGFONTW lf{};
+    GetObjectW((HFONT)SendMessageW(d, WM_GETFONT, 0, 0), sizeof(lf), &lf);
+    lf.lfWeight = FW_SEMIBOLD; lf.lfHeight = lf.lfHeight * 13 / 10;
+    return CreateFontIndirectW(&lf);
+}
+static void PanelChrome(HWND d, HWND owner) {
+    DWORD corner = 2;   // DWMWCP_ROUND (Windows 11)
+    DwmSetWindowAttribute(d, 33 /*DWMWA_WINDOW_CORNER_PREFERENCE*/, &corner, sizeof(corner));
+    RECT rp, rd; GetWindowRect(owner ? owner : g_hwnd, &rp); GetWindowRect(d, &rd);
+    SetWindowPos(d, nullptr, rp.left + ((rp.right - rp.left) - (rd.right - rd.left)) / 2,
+                 rp.top + ((rp.bottom - rp.top) - (rd.bottom - rd.top)) / 2, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+}
+
+struct MsgArgs { std::wstring head, body, ok, cancel; bool danger; HWND owner; };
+static INT_PTR CALLBACK MsgProc(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
+    static HFONT head;
+    switch (msg) {
+    case WM_INITDIALOG: {
+        auto* a = (MsgArgs*)lp;
+        SetWindowLongPtrW(d, DWLP_USER, lp);
+        head = MakeHeadFont(d);
+        HWND hH = GetDlgItem(d, IDC_PL_HEAD), hB = GetDlgItem(d, IDC_PL_BODY);
+        HWND hOk = GetDlgItem(d, IDOK), hCa = GetDlgItem(d, IDCANCEL);
+        SendMessageW(hH, WM_SETFONT, (WPARAM)head, TRUE);
+        SetWindowTextW(hH, a->head.c_str()); SetWindowTextW(hB, a->body.c_str());
+        SetWindowTextW(hOk, a->ok.c_str());
+        // layout in dialog units, then grow the body to fit its text
+        RECT u{ 14, 12, 240, 0 }; MapDialogRect(d, &u);   // u.left=margin, u.top=top, u.right=width
+        RECT gap{ 0, 0, 8, 20 }; MapDialogRect(d, &gap);
+        RECT btn{ 0, 0, 56, 16 }; MapDialogRect(d, &btn);
+        int W = u.right, M = u.left, textW = W - 2 * M;
+        auto measure = [&](HWND h, HFONT f, const std::wstring& t) {
+            if (t.empty()) return 0;
+            HDC dc = GetDC(h); HGDIOBJ o = SelectObject(dc, f);
+            RECT rc{ 0, 0, textW, 0 };
+            DrawTextW(dc, t.c_str(), -1, &rc, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
+            SelectObject(dc, o); ReleaseDC(h, dc); return (int)rc.bottom;
+        };
+        HFONT body = (HFONT)SendMessageW(d, WM_GETFONT, 0, 0);
+        int y = u.top, hh = measure(hH, head, a->head);
+        MoveWindow(hH, M, y, textW, hh, FALSE); y += hh;
+        int bh = measure(hB, body, a->body);
+        if (bh) { y += gap.right; MoveWindow(hB, M, y, textW, bh, FALSE); y += bh; }
+        else ShowWindow(hB, SW_HIDE);
+        y += gap.bottom;
+        int x = W - M - btn.right;
+        if (a->cancel.empty()) { ShowWindow(hCa, SW_HIDE); MoveWindow(hOk, x, y, btn.right, btn.bottom, FALSE); }
+        else {
+            SetWindowTextW(hCa, a->cancel.c_str());
+            MoveWindow(hCa, x, y, btn.right, btn.bottom, FALSE);
+            MoveWindow(hOk, x - gap.right - btn.right, y, btn.right, btn.bottom, FALSE);
+        }
+        y += btn.bottom + u.top;
+        RECT wr{ 0, 0, W, y }; AdjustWindowRectEx(&wr, GetWindowLongW(d, GWL_STYLE), FALSE, GetWindowLongW(d, GWL_EXSTYLE));
+        SetWindowPos(d, nullptr, 0, 0, wr.right - wr.left, wr.bottom - wr.top, SWP_NOMOVE | SWP_NOZORDER);
+        PanelChrome(d, a->owner);
+        if (a->danger && !a->cancel.empty()) {   // destructive: focus Cancel, Enter = Cancel
+            SendMessageW(d, DM_SETDEFID, IDCANCEL, 0);
+            SetFocus(hCa);
+        } else SetFocus(hOk);
+        return FALSE;
+    }
+    case WM_DRAWITEM:
+        if (((DRAWITEMSTRUCT*)lp)->CtlID == IDOK) {
+            auto* a = (MsgArgs*)GetWindowLongPtrW(d, DWLP_USER);
+            DrawPrimaryBtn(d, (DRAWITEMSTRUCT*)lp, a && a->danger);
+            return TRUE;
+        }
+        break;
+    case WM_LBUTTONDOWN:
+        ReleaseCapture(); SendMessageW(d, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+        return TRUE;
+    case WM_COMMAND:
+        if (LOWORD(wp) == IDOK || LOWORD(wp) == IDCANCEL) { EndDialog(d, LOWORD(wp)); return TRUE; }
+        break;
+    case WM_DESTROY:
+        if (head) { DeleteObject(head); head = nullptr; }
+        break;
+    }
+    return FALSE;
+}
+// Silent replacement for MessageBox. cancel empty = single button. Returns true for the primary button.
+static bool Ask(HWND owner, const std::wstring& head, const std::wstring& body,
+                const std::wstring& ok, const std::wstring& cancel = L"", bool danger = false) {
+    MsgArgs a{ head, body, ok, cancel, danger, owner };
+    return DialogBoxParamW(g_hInst, MAKEINTRESOURCEW(IDD_MSG), owner ? owner : g_hwnd, MsgProc, (LPARAM)&a) == IDOK;
+}
+
 // "This link is part of a playlist": custom panel (bold heading, two choices, blue OK)
 static INT_PTR CALLBACK PlaylistProc(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
     static HFONT head;
@@ -1402,43 +1524,16 @@ static INT_PTR CALLBACK PlaylistProc(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
         for (int id : { IDC_PL_HEAD, IDC_PL_BODY, IDC_PL_ONE, IDC_PL_ALL, IDOK, IDCANCEL }) {
             GetDlgItemTextW(d, id, b, 256); SetDlgItemTextW(d, id, T(b));
         }
-        LOGFONTW lf{};
-        GetObjectW((HFONT)SendMessageW(d, WM_GETFONT, 0, 0), sizeof(lf), &lf);
-        lf.lfWeight = FW_SEMIBOLD; lf.lfHeight = lf.lfHeight * 13 / 10;
-        head = CreateFontIndirectW(&lf);
+        head = MakeHeadFont(d);
         SendDlgItemMessageW(d, IDC_PL_HEAD, WM_SETFONT, (WPARAM)head, TRUE);
         CheckRadioButton(d, IDC_PL_ONE, IDC_PL_ALL, IDC_PL_ONE);
-        DWORD corner = 2;   // DWMWCP_ROUND (Windows 11)
-        DwmSetWindowAttribute(d, 33 /*DWMWA_WINDOW_CORNER_PREFERENCE*/, &corner, sizeof(corner));
-        // centre over the main window
-        RECT rp, rd; GetWindowRect(g_hwnd, &rp); GetWindowRect(d, &rd);
-        SetWindowPos(d, nullptr, rp.left + ((rp.right - rp.left) - (rd.right - rd.left)) / 2,
-                     rp.top + ((rp.bottom - rp.top) - (rd.bottom - rd.top)) / 2, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        PanelChrome(d, g_hwnd);
         SetFocus(GetDlgItem(d, IDC_PL_ONE));
         return FALSE;
     }
-    case WM_DRAWITEM: {
-        auto* di = (DRAWITEMSTRUCT*)lp;
-        if (di->CtlID != IDOK) break;
-        bool down = di->itemState & ODS_SELECTED, focus = di->itemState & ODS_FOCUS;
-        COLORREF fill = down ? RGB(0, 84, 158) : RGB(0, 103, 192);
-        FillRect(di->hDC, &di->rcItem, GetSysColorBrush(COLOR_BTNFACE));
-        HBRUSH br = CreateSolidBrush(fill);
-        HPEN pen = CreatePen(PS_SOLID, 1, fill);
-        HGDIOBJ ob = SelectObject(di->hDC, br), op = SelectObject(di->hDC, pen);
-        int r = S(6);
-        RoundRect(di->hDC, di->rcItem.left, di->rcItem.top, di->rcItem.right, di->rcItem.bottom, r, r);
-        SelectObject(di->hDC, ob); SelectObject(di->hDC, op); DeleteObject(br); DeleteObject(pen);
-        wchar_t t[64]; GetWindowTextW(di->hwndItem, t, 64);
-        SetBkMode(di->hDC, TRANSPARENT); SetTextColor(di->hDC, RGB(255, 255, 255));
-        HGDIOBJ of = SelectObject(di->hDC, (HFONT)SendMessageW(d, WM_GETFONT, 0, 0));
-        DrawTextW(di->hDC, t, -1, &di->rcItem, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-        SelectObject(di->hDC, of);
-        if (focus && !(di->itemState & ODS_NOFOCUSRECT)) {
-            RECT fr = di->rcItem; InflateRect(&fr, -S(3), -S(3)); SetTextColor(di->hDC, RGB(255, 255, 255)); DrawFocusRect(di->hDC, &fr);
-        }
-        return TRUE;
-    }
+    case WM_DRAWITEM:
+        if (((DRAWITEMSTRUCT*)lp)->CtlID == IDOK) { DrawPrimaryBtn(d, (DRAWITEMSTRUCT*)lp, false); return TRUE; }
+        break;
     case WM_LBUTTONDOWN:   // no title bar: drag anywhere on the panel
         ReleaseCapture(); SendMessageW(d, WM_NCLBUTTONDOWN, HTCAPTION, 0);
         return TRUE;
@@ -1907,7 +2002,7 @@ static INT_PTR CALLBACK SubLangsProc(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
             for (int i = 0; i < kSubLangCount; ++i)
                 if (IsDlgButtonChecked(d, IDC_SL_FIRST + i) == BST_CHECKED) r += (r.empty() ? L"" : L",") + std::wstring(kSubLangs[i].code);
             if (r.empty()) {
-                MessageBoxW(d, T(L"请至少选择一种字幕语言"), T(L"选择字幕语言"), MB_OK | MB_ICONINFORMATION);
+                Ask(d, T(L"请至少选择一种字幕语言"), L"", T(L"确定"));
                 return TRUE;
             }
             *(std::wstring*)GetWindowLongPtrW(d, DWLP_USER) = r;
@@ -2251,9 +2346,9 @@ static void OnCommand(HWND hwnd, int id, int code) {
         if (DialogBoxParamW(g_hInst, MAKEINTRESOURCEW(IDD_SETTINGS), hwnd, SettingsProc, 0) == IDOK) {
             DetectTools(); UpdateToolStatus(); Pump();
             if (g_langChanged &&
-                MessageBoxW(hwnd, L"界面语言将在重启后生效，现在重启 YtGrab 吗？（未完成的下载会保留）\n\n"
-                                  L"The new language applies after a restart. Restart YtGrab now? (Unfinished downloads are kept.)",
-                            L"YtGrab", MB_YESNO | MB_ICONQUESTION) == IDYES) {
+                Ask(hwnd, L"重启 YtGrab？  Restart YtGrab?",
+                    L"界面语言将在重启后生效，未完成的下载会保留。\nThe new language applies after a restart. Unfinished downloads are kept.",
+                    L"重启 Restart", L"稍后 Later")) {
                 g_restart = true;
                 PostMessageW(hwnd, WM_CLOSE, 0, 0);
             }
@@ -2317,8 +2412,8 @@ static void OnCommand(HWND hwnd, int id, int code) {
         int n = 0;
         for (auto& f : files) if (f.size() < 5 || f.compare(f.size() - 5, 5, L".part") != 0) ++n;
         if (!n) n = (int)files.size();
-        std::wstring q = T(L"确定从硬盘删除选中任务的 ") + std::to_wstring(n) + T(L" 个文件吗？\n文件会移到回收站，这些任务也会从列表中移除。");
-        if (MessageBoxW(hwnd, q.c_str(), T(L"YtGrab 视频下载器"), MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES) break;
+        std::wstring q = T(L"删除 ") + std::to_wstring(n) + T(L" 个文件？");
+        if (!Ask(hwnd, q, T(L"文件会移到回收站，这些任务也会从列表中移除。"), T(L"删除"), T(L"取消"), true)) break;
         RemoveTasks(sel);           // stops any that are still running
         Sleep(300);                 // let a stopped yt-dlp release its file
         std::wstring list;
@@ -2395,8 +2490,8 @@ static bool ConfirmClose() {
         for (auto& t : g_tasks) if (IsActive(t->st)) ++active;
     }
     if (!active) return true;
-    std::wstring m = std::wstring(T(L"还有 ")) + std::to_wstring(active) + T(L" 个任务正在下载，退出将暂停它们，下次打开后点「开始全部」继续。确定退出吗？");
-    return MessageBoxW(g_hwnd, m.c_str(), T(kAppName), MB_OKCANCEL | MB_ICONWARNING | MB_DEFBUTTON2) == IDOK;
+    std::wstring m = std::wstring(T(L"还有 ")) + std::to_wstring(active) + T(L" 个任务正在下载");
+    return Ask(g_hwnd, m, T(L"退出会暂停它们，下次打开后点「开始全部」继续。"), T(L"退出"), T(L"取消"));
 }
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -2479,7 +2574,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (g_hSettingsDlg) ShowCompInfo(g_hSettingsDlg);
             if (g_hSettingsDlg)
                 SetDlgItemTextW(g_hSettingsDlg, IDC_COMPINFO, wp == 1 ? T(L"完成") : T(L"失败，详见状态栏"));
-            if (wp == 2) MessageBoxW(g_hSettingsDlg ? g_hSettingsDlg : hwnd, m->c_str(), T(kAppName), MB_OK | MB_ICONWARNING);
+            if (wp == 2) Ask(g_hSettingsDlg ? g_hSettingsDlg : hwnd, T(L"操作没有完成"), *m, T(L"确定"));
             Pump();
         }
         return 0;

@@ -18,6 +18,7 @@
 #define IDC_YTVER       1016
 #define IDC_RATEUNIT    1018
 #define IDD_PLAYLIST    102
+#define IDD_MSG         103
 #define IDC_PL_HEAD     1130
 #define IDC_PL_BODY     1131
 #define IDC_PL_ONE      1132
