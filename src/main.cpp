@@ -46,7 +46,7 @@ enum {
     IDC_URLLBL = 200, IDC_URL, IDC_PASTE, IDC_FMTLBL, IDC_FMT, IDC_DIRLBL, IDC_DIR,
     IDC_BROWSE, IDC_STARTALL, IDC_STOPALL, IDC_SETTINGS, IDC_OPENDIR, IDC_LOGIN, IDC_LIST, IDC_STATUS, IDC_BUSY, IDC_BUSYTXT,
     ID_OPENFILE = 300, ID_OPENFOLDER, ID_COPYURL, ID_RETRY, ID_CANCELTASK, ID_REMOVE,
-    ID_CLEARDONE, ID_SELALL, ID_DELFILE, ID_UPDATE_YTDLP, ID_GET_FFMPEG, ID_GET_YTDLP, ID_LOGINSITE
+    ID_CLEARDONE, ID_SELALL, ID_DELFILE, ID_UPDATE_YTDLP, ID_GET_FFMPEG, ID_GET_YTDLP, ID_LOGINSITE, ID_PRIORITY
 };
 #define IDC_ADD IDOK
 
@@ -236,6 +236,8 @@ static const TrPair EN_TABLE[] = {
     { L"在这里登录网站后，下载时会自动使用登录状态（设置里 Cookies 选「内置浏览器」）", L"Sign in to sites here; downloads then use that sign-in (Settings: Cookies from built-in browser)" },
     { L"目前只能抓取小红书主页或笔记；其他网站登录后直接在主窗口粘贴链接即可", L"Grabbing works on Xiaohongshu profiles and notes; for other sites just sign in, then paste links in the main window" },
     { L"正在打开：", L"Opening: " },
+    { L"优先下载", L"Download first" },
+    { L"已移到队列最前：", L"Moved to the front of the queue: " },
     { L"小红书网页版打不开这条笔记（可能已删除、仅 App 可见或需要登录）", L"The Xiaohongshu website can't open this note (deleted, app-only, or sign-in needed)" },
     { L"正在打开主页…", L"Opening the profile…" },
     { L"请先在这个窗口登录小红书，登录后会自动继续", L"Please sign in to Xiaohongshu in this window; grabbing continues automatically" },
@@ -498,6 +500,7 @@ struct Task {
     int fmt = 0;
     bool playlist = false;
     // mutable, guarded by g_mx
+    long long prio = 0;          // 优先下载: a higher number starts first
     std::wstring title, filepath, err;
     TaskState st = TS_QUEUED;
     double pct = 0, total = -1, speed = -1, eta = -1;
@@ -842,7 +845,9 @@ static void Pump() {
         std::lock_guard<std::mutex> lk(g_mx);
         int running = 0;
         for (auto& t : g_tasks) if (IsActive(t->st)) ++running;
-        for (auto& t : g_tasks) {
+        std::vector<std::shared_ptr<Task>> order(g_tasks.begin(), g_tasks.end());
+        std::stable_sort(order.begin(), order.end(), [](const std::shared_ptr<Task>& a, const std::shared_ptr<Task>& b) { return a->prio > b->prio; });
+        for (auto& t : order) {
             if (running >= g_set.conc) break;
             if (t->st == TS_QUEUED && (!noYt || !t->media.empty())) {
                 t->st = TS_STARTING; t->cancel = false; t->err.clear(); t->dirty = true;
@@ -1970,13 +1975,14 @@ static void OnTimer() {
 
 static void ShowContextMenu(int x, int y) {
     auto sel = SelectedTasks();
-    bool any = !sel.empty(), canRetry = false, canCancel = false, hasFile = false;
+    bool any = !sel.empty(), canRetry = false, canCancel = false, hasFile = false, canPrio = false;
     {
         std::lock_guard<std::mutex> lk(g_mx);
         for (auto& t : sel) {
             if (IsActive(t->st) || t->st == TS_QUEUED || t->st == TS_EXPANDING || t->st == TS_PAUSED) canCancel = true;
             if (t->st == TS_FAILED || t->st == TS_CANCELED || t->st == TS_DONE || t->st == TS_PAUSED) canRetry = true;
             if (!t->filepath.empty()) hasFile = true;
+            if (t->st == TS_QUEUED || t->st == TS_PAUSED) canPrio = true;
         }
     }
     if (x == -1 && y == -1) {
@@ -1993,6 +1999,7 @@ static void ShowContextMenu(int x, int y) {
     AppendMenuW(m, (any && hasFile) ? on : off, ID_OPENFILE, T(L"打开文件\tEnter"));
     AppendMenuW(m, any ? on : off, ID_OPENFOLDER, T(L"打开所在文件夹"));
     AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(m, canPrio ? on : off, ID_PRIORITY, T(L"优先下载"));
     AppendMenuW(m, canRetry ? on : off, ID_RETRY, T(L"重新下载"));
     AppendMenuW(m, canCancel ? on : off, ID_CANCELTASK, T(L"取消"));
     AppendMenuW(m, any ? on : off, ID_COPYURL, T(L"复制链接"));
@@ -2433,6 +2440,27 @@ static void OnCommand(HWND hwnd, int id, int code) {
             }
         }
         if (g_ytdlp.empty()) PromptYtdlp(); else Pump();
+        break;
+    }
+    case ID_PRIORITY: {
+        static long long seq = 0;
+        auto sel = SelectedTasks();
+        int n = 0;
+        {
+            std::lock_guard<std::mutex> lk(g_mx);
+            ++seq;                       // the newest pick goes ahead of earlier ones; a group keeps its order
+            for (auto& t : sel) {
+                if (t->st != TS_QUEUED && t->st != TS_PAUSED) continue;
+                t->prio = seq;
+                if (t->st == TS_PAUSED) { t->st = TS_QUEUED; t->cancel = false; t->pause = false; t->speed = -1; t->eta = -1; }
+                t->dirty = true; ++n;
+            }
+        }
+        if (n) {
+            g_statusMsg = T(L"已移到队列最前：") + std::to_wstring(n) + T(L" 个任务");
+            SetStatusPart(0, g_statusMsg);
+            PumpOrPrompt();
+        }
         break;
     }
     case ID_CANCELTASK:

@@ -1,13 +1,24 @@
 ## What's new / 更新内容
 
+- **Download first.** Right-click a queued or paused task > **Download first** moves it to the front of the queue; it starts as soon as a slot is free.
+  **优先下载。** 右键排队中或已暂停的任务 >「优先下载」，移到队列最前，有空位时第一个开始。
+- **One progress bar per task.** High-quality downloads fetch video and audio separately; progress now runs 0%→100% once, sized by both streams together, and Info shows "Downloading video / Downloading audio / Merging". Size shows the combined total.
+  **进度只走一次。** 高画质的视频和音频分开下载，现在按两者总大小合并计算，每个任务只从 0% 走到 100% 一次；「信息」列显示「正在下载视频 / 正在下载音频 / 正在合并」，大小显示两者合计。
+- **Xiaohongshu share links (xhslink.cn) fixed.** When the link lands on the sign-in page, the built-in browser asks you to sign in and then goes back to the note by itself; if the website refuses an app share link it retries once another way. Pasting a new link no longer gets stuck behind an earlier one.
+  **小红书分享链接（xhslink.cn）修复。** 跳到登录页时会提示登录，登录后自动回到那条笔记继续抓取；网页版拒绝 App 分享链接时会换一种方式重试一次；之前卡住的任务不再挡住新粘贴的链接。
+- **Column widths stay where you drag them.** Widening a column no longer makes the list jump or snap back, and the widths are remembered.
+  **列宽拖到多宽就是多宽。** 拉宽列时不再来回跳动、松手还原，下次打开也会记住。
+- **Calmer dialogs.** Message panels use standard system buttons instead of filled blue/red ones.
+  **弹窗按钮更统一。** 提示面板改用标准系统按钮，不再是蓝色/红色实心按钮。
+
+### Earlier / 之前
+
 - **New playlist prompt.** A clean panel with a bold heading and two choices ("Only this video" is selected), plus OK and Cancel.
   **播放列表询问改版。** 新样式面板：粗体标题、两个选项（默认「只下载当前视频」），右下角「确定」「取消」。
 - **Speed limit box lines up with its unit box.**
   **限速输入框与单位下拉框对齐。**
 - **No more sounds.** Every message and confirmation is now a silent panel in the same style; Delete uses a red button with Cancel focused by default.
   **全程无提示音。** 所有提示和确认框都换成同样式的静音面板；删除文件用红色按钮，默认选中「取消」。
-
-### Earlier / 之前
 
 - **Subtitles in 13 languages.** Settings > Subtitles now has a **Languages…** button: pick any of English, Simplified/Traditional Chinese, Japanese, Korean, Spanish, French, German, Russian, Vietnamese, Thai, Portuguese, Arabic (Select all / Clear). Default stays English + Simplified Chinese.
   **字幕支持 13 种语言。** 设置里「下载字幕」旁新增「字幕语言…」按钮，可多选英语、简体/繁体中文、日语、韩语、西班牙语、法语、德语、俄语、越南语、泰语、葡萄牙语、阿拉伯语（全选 / 清空），默认仍为英语 + 简体中文。
