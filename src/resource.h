@@ -14,4 +14,10 @@
 #define IDC_GETFF       1011
 #define IDC_COMPINFO    1012
 #define IDC_LANG        1013
+#define IDC_SUBLANGS    1014
+#define IDD_SUBLANGS    101
+#define IDC_SL_FIRST    1101
+#define IDC_SL_ALL      1120
+#define IDC_SL_NONE     1121
+#define IDC_SL_HEAD     1122
 #define IDR_XHSJS       200

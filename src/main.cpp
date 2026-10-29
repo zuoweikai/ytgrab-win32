@@ -183,6 +183,13 @@ static const TrPair EN_TABLE[] = {
     { L"每个任务的分片线程：", L"Fragments per task:" },
     { L"限速：", L"Rate limit:" },
     { L"下载字幕（中文 / 英文）", L"Subtitles (Chinese / English)" },
+    { L"下载字幕", L"Subtitles" },
+    { L"字幕语言…", L"Languages…" },
+    { L"选择字幕语言", L"Subtitle languages" },
+    { L"请选择需要下载的字幕语言（可多选）：", L"Choose the subtitle languages to download (any number):" },
+    { L"全选", L"Select all" },
+    { L"清空", L"Clear" },
+    { L"请至少选择一种字幕语言", L"Choose at least one subtitle language" },
     { L"嵌入封面", L"Embed thumbnail" },
     { L"网络", L"Network" },
     { L"代理：", L"Proxy:" },
@@ -343,10 +350,34 @@ static std::wstring DirOf(const std::wstring& p) {
 // ---------------------------------------------------------------------------
 // Settings (INI, portable if settings.ini sits next to the exe)
 // ---------------------------------------------------------------------------
+// Subtitle languages offered in Settings > Subtitle languages (code, 中文, English, yt-dlp --sub-langs patterns)
+struct SubLang { const wchar_t *code, *zh, *en, *pat; };
+static const SubLang kSubLangs[] = {
+    { L"en",      L"英语",     L"English",               L"en.*" },
+    { L"zh-Hans", L"简体中文", L"Chinese (Simplified)",  L"zh-Hans.*,zh-CN,zh-SG,zh" },
+    { L"zh-Hant", L"繁体中文", L"Chinese (Traditional)", L"zh-Hant.*,zh-TW,zh-HK" },
+    { L"ja",      L"日语",     L"Japanese",              L"ja.*" },
+    { L"ko",      L"韩语",     L"Korean",                L"ko.*" },
+    { L"es",      L"西班牙语", L"Spanish",               L"es.*" },
+    { L"fr",      L"法语",     L"French",                L"fr.*" },
+    { L"de",      L"德语",     L"German",                L"de.*" },
+    { L"ru",      L"俄语",     L"Russian",               L"ru.*" },
+    { L"vi",      L"越南语",   L"Vietnamese",            L"vi.*" },
+    { L"th",      L"泰语",     L"Thai",                  L"th.*" },
+    { L"pt",      L"葡萄牙语", L"Portuguese",            L"pt.*" },
+    { L"ar",      L"阿拉伯语", L"Arabic",                L"ar.*" },
+};
+static const int kSubLangCount = (int)(sizeof(kSubLangs) / sizeof(*kSubLangs));
+static bool SubLangOn(const std::wstring& list, const wchar_t* code) {
+    std::wstring l = L"," + list + L",", c = std::wstring(L",") + code + L",";
+    return l.find(c) != std::wstring::npos;
+}
+
 struct Settings {
     std::wstring outDir, proxy, cookies, rate, ytdlpPath;
     int fmt = 0, conc = 3, frag = 4, lang = 0;   // lang: 0 system, 1 中文, 2 English
     bool playlist = false, subs = false, thumb = false;
+    std::wstring subLangs = L"en,zh-Hans";   // codes from kSubLangs, comma separated
     int x = CW_USEDEFAULT, y = CW_USEDEFAULT, w = 0, h = 0; bool maximized = false;
 };
 static Settings g_set;
@@ -381,6 +412,8 @@ static void LoadSettings() {
     g_set.frag     = std::max(1, std::min(16, IniInt(L"Fragments", 4)));
     g_set.playlist = IniInt(L"Playlist", 0) != 0;
     g_set.subs     = IniInt(L"Subtitles", 0) != 0;
+    g_set.subLangs = IniStr(L"SubLangs", L"en,zh-Hans");
+    if (g_set.subLangs.empty()) g_set.subLangs = L"en,zh-Hans";
     g_set.thumb    = IniInt(L"Thumbnail", 0) != 0;
     g_set.x = IniInt(L"WinX", (int)CW_USEDEFAULT); g_set.y = IniInt(L"WinY", (int)CW_USEDEFAULT);
     g_set.w = IniInt(L"WinW", 0); g_set.h = IniInt(L"WinH", 0);
@@ -395,6 +428,7 @@ static void SaveSettings() {
     IniPut(L"Format", g_set.fmt);      IniPut(L"Concurrency", g_set.conc);
     IniPut(L"Fragments", g_set.frag);  IniPut(L"Playlist", g_set.playlist);
     IniPut(L"Subtitles", g_set.subs);  IniPut(L"Thumbnail", g_set.thumb);
+    IniPut(L"SubLangs", g_set.subLangs);
     IniPut(L"WinX", g_set.x); IniPut(L"WinY", g_set.y); IniPut(L"WinW", g_set.w); IniPut(L"WinH", g_set.h);
     IniPut(L"WinMax", g_set.maximized);
     IniPut(L"Language", g_set.lang);
@@ -630,7 +664,11 @@ static std::wstring BuildArgs(Task& t) {
     a += CookieArgs(&t.ckTmp);
     if (!g_set.rate.empty())    a += L" -r " + Q(g_set.rate);
     if (g_set.subs) {
-        a += L" --write-subs --sub-langs " + Q(L"zh.*,en.*");
+        std::wstring pats;
+        for (int i = 0; i < kSubLangCount; ++i)
+            if (SubLangOn(g_set.subLangs, kSubLangs[i].code)) pats += (pats.empty() ? L"" : L",") + std::wstring(kSubLangs[i].pat);
+        if (pats.empty()) pats = L"en.*,zh-Hans.*,zh-CN,zh";
+        a += L" --write-subs --sub-langs " + Q(pats);
         if (ff) a += L" --embed-subs";
     }
     if (g_set.thumb && ff) a += L" --embed-thumbnail";
@@ -1750,6 +1788,59 @@ static void ShowContextMenu(int x, int y) {
 static const wchar_t* kBrowsers[] = { L"不使用", L"builtin", L"firefox", L"chrome", L"edge", L"brave", L"opera", L"vivaldi", L"chromium" };
 
 static bool g_langChanged = false, g_restart = false;
+// Settings > Subtitle languages: a check box per language, two columns. lParam: std::wstring* (in/out)
+static INT_PTR CALLBACK SubLangsProc(HWND d, UINT msg, WPARAM wp, LPARAM lp) {
+    static HFONT bold;
+    switch (msg) {
+    case WM_INITDIALOG: {
+        SetWindowLongPtrW(d, DWLP_USER, lp);
+        auto* list = (std::wstring*)lp;
+        wchar_t b[256];
+        GetWindowTextW(d, b, 256); SetWindowTextW(d, T(b));
+        for (int id : { IDC_SL_HEAD, IDC_SL_ALL, IDC_SL_NONE, IDOK, IDCANCEL }) {
+            GetDlgItemTextW(d, id, b, 256); SetDlgItemTextW(d, id, T(b));
+        }
+        LOGFONTW lf{};
+        GetObjectW((HFONT)SendMessageW(d, WM_GETFONT, 0, 0), sizeof(lf), &lf);
+        lf.lfWeight = FW_SEMIBOLD;
+        bold = CreateFontIndirectW(&lf);
+        SendDlgItemMessageW(d, IDC_SL_HEAD, WM_SETFONT, (WPARAM)bold, TRUE);
+        for (int i = 0; i < kSubLangCount; ++i) {
+            SetDlgItemTextW(d, IDC_SL_FIRST + i, g_en ? kSubLangs[i].en : kSubLangs[i].zh);
+            CheckDlgButton(d, IDC_SL_FIRST + i, SubLangOn(*list, kSubLangs[i].code) ? BST_CHECKED : BST_UNCHECKED);
+        }
+        return TRUE;
+    }
+    case WM_COMMAND:
+        switch (LOWORD(wp)) {
+        case IDC_SL_ALL: case IDC_SL_NONE:
+            for (int i = 0; i < kSubLangCount; ++i)
+                CheckDlgButton(d, IDC_SL_FIRST + i, LOWORD(wp) == IDC_SL_ALL ? BST_CHECKED : BST_UNCHECKED);
+            return TRUE;
+        case IDOK: {
+            std::wstring r;
+            for (int i = 0; i < kSubLangCount; ++i)
+                if (IsDlgButtonChecked(d, IDC_SL_FIRST + i) == BST_CHECKED) r += (r.empty() ? L"" : L",") + std::wstring(kSubLangs[i].code);
+            if (r.empty()) {
+                MessageBoxW(d, T(L"请至少选择一种字幕语言"), T(L"选择字幕语言"), MB_OK | MB_ICONINFORMATION);
+                return TRUE;
+            }
+            *(std::wstring*)GetWindowLongPtrW(d, DWLP_USER) = r;
+            EndDialog(d, IDOK);
+            return TRUE;
+        }
+        case IDCANCEL: EndDialog(d, IDCANCEL); return TRUE;
+        }
+        break;
+    case WM_DESTROY:
+        if (bold) { DeleteObject(bold); bold = nullptr; }
+        break;
+    }
+    return FALSE;
+}
+
+static std::wstring g_subLangsEdit;   // the choice while Settings is open
+
 static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
     switch (msg) {
     case WM_INITDIALOG: {
@@ -1809,12 +1900,20 @@ static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
         SendDlgItemMessageW(d, IDC_PROXY, EM_SETCUEBANNER, TRUE, (LPARAM)T(L"例如 http://127.0.0.1:7890"));
         SendDlgItemMessageW(d, IDC_YTPATH, EM_SETCUEBANNER, TRUE, (LPARAM)T(L"留空自动查找"));
         CheckDlgButton(d, IDC_SUBS, g_set.subs ? BST_CHECKED : BST_UNCHECKED);
+        g_subLangsEdit = g_set.subLangs;
+        EnableWindow(GetDlgItem(d, IDC_SUBLANGS), g_set.subs);
         CheckDlgButton(d, IDC_THUMB, g_set.thumb ? BST_CHECKED : BST_UNCHECKED);
         SetDlgItemTextW(d, IDC_COMPINFO, g_ffmpeg.empty() ? T(L"ffmpeg 未安装（合并高清需要）") : T(L"ffmpeg 已就绪"));
         return TRUE;
     }
     case WM_COMMAND:
         switch (LOWORD(wp)) {
+        case IDC_SUBS:
+            EnableWindow(GetDlgItem(d, IDC_SUBLANGS), IsDlgButtonChecked(d, IDC_SUBS) == BST_CHECKED);
+            return TRUE;
+        case IDC_SUBLANGS:
+            DialogBoxParamW(g_hInst, MAKEINTRESOURCEW(IDD_SUBLANGS), d, SubLangsProc, (LPARAM)&g_subLangsEdit);
+            return TRUE;
         case IDC_YTBROWSE: {
             wchar_t file[MAX_PATH] = L"";
             OPENFILENAMEW of{}; of.lStructSize = sizeof(of); of.hwndOwner = d;
@@ -1841,6 +1940,7 @@ static INT_PTR CALLBACK SettingsProc(HWND d, UINT msg, WPARAM wp, LPARAM) {
             GetDlgItemTextW(d, IDC_PROXY, b, 2048);  g_set.proxy = Trim(b);
             GetDlgItemTextW(d, IDC_YTPATH, b, 2048); g_set.ytdlpPath = Trim(b);
             g_set.subs = IsDlgButtonChecked(d, IDC_SUBS) == BST_CHECKED;
+            g_set.subLangs = g_subLangsEdit;
             g_set.thumb = IsDlgButtonChecked(d, IDC_THUMB) == BST_CHECKED;
             {
                 int lg = (int)SendDlgItemMessageW(d, IDC_LANG, CB_GETCURSEL, 0, 0);
