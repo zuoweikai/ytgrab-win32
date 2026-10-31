@@ -4,6 +4,15 @@
 
 一款基于 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 的 Windows 视频下载器，小巧快速。使用 C++ 和原生 Win32 控件编写，静态编译为单个约 350 KB 的 `YtGrab.exe`，无需安装 .NET、VC++ 运行库或 Python。发布包已内置 yt-dlp 和 ffmpeg。
 
+![YtGrab 主界面](docs/screenshots/main-zh.png)
+
+<details>
+<summary>设置</summary>
+
+![YtGrab 设置](docs/screenshots/settings-zh.png)
+
+</details>
+
 
 ## 下载
 
