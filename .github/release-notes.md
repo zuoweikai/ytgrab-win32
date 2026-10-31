@@ -1,10 +1,14 @@
 ## What's new / 更新内容
 
-- **Xiaohongshu home pages are much faster.** YtGrab now reads each note as it appears while scrolling and starts downloading right away, instead of scrolling the whole profile first. If Xiaohongshu refuses the background request, it opens the note on the page and reads it there, so profiles no longer end with zero results.
-  **小红书主页抓取大幅提速。** 改为边滚动边读取，读到一条就立即开始下载，不再等整个主页滚完；若小红书拒绝后台请求，会直接在页面上打开笔记读取，不再出现抓取结果为 0 的情况。
+- **Xiaohongshu home pages add every note.** The profile list only keeps cards near the screen, so earlier versions skipped most notes (e.g. "read 52, added 2"). YtGrab now opens notes as their cards come into view, reads each note from the page's own data, retries misses, and does a final pass from the top. It also keeps scrolling to the real end even when the note count is already known.
+  **小红书主页笔记不再漏加。** 主页列表只保留屏幕附近的卡片，旧版会跳过大部分笔记（如「读取 52 条，只加入 2 条」）。现在随滚动打开出现在屏幕上的笔记，直接读取页面自己加载的数据，失败会重试，最后再从顶部补扫一遍；即使已知笔记总数，也会一直滚到真正的底部。
+- **Cookies from defaults to the built-in browser.** Settings saved as "None" by older versions are switched to **Built-in browser** once; after that your choice is kept.
+  **Cookies 来源默认改为内置浏览器。** 旧版保存为「不使用」的设置会自动改为「内置浏览器」一次，之后按你的选择保留。
 
 ### Earlier / 之前
 
+- **Xiaohongshu home pages are much faster.** YtGrab now reads each note as it appears while scrolling and starts downloading right away, instead of scrolling the whole profile first. If Xiaohongshu refuses the background request, it opens the note on the page and reads it there, so profiles no longer end with zero results.
+  **小红书主页抓取大幅提速。** 改为边滚动边读取，读到一条就立即开始下载，不再等整个主页滚完；若小红书拒绝后台请求，会直接在页面上打开笔记读取，不再出现抓取结果为 0 的情况。
 - **Download first.** Right-click a queued or paused task > **Download first** moves it to the front of the queue; it starts as soon as a slot is free.
   **优先下载。** 右键排队中或已暂停的任务 >「优先下载」，移到队列最前，有空位时第一个开始。
 - **One progress bar per task.** High-quality downloads fetch video and audio separately; progress now runs 0%→100% once, sized by both streams together, and Info shows "Downloading video / Downloading audio / Merging". Size shows the combined total.
