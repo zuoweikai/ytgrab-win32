@@ -1054,9 +1054,13 @@ static void Expander(std::shared_ptr<Task> t, std::wstring exe, HWND hwnd) {
             for (auto& l : lists) {
                 int n = 0; for (auto& e : v) if (e.list == l) ++n;
                 int i = 0;
+                // Playlists go under the creator's folder: <save folder>\<creator>\<playlist>.
+                std::wstring who;
+                for (auto& e : v) if (e.list == l && !(who = SafeFolder(e.owner)).empty()) break;
                 std::wstring dir = t->outDir;
                 std::wstring f = SafeFolder(l);
-                if (v.size() > 1 && !f.empty()) dir += L"\\" + f;
+                if (!who.empty()) dir += L"\\" + who;
+                if (v.size() > 1 && !f.empty() && f != who) dir += L"\\" + f;
                 for (auto& e : v) {
                     if (e.list != l) continue;
                     auto k = std::make_shared<Task>();
