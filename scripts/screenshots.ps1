@@ -1,4 +1,4 @@
-# Takes README screenshots of the real app on a Windows runner: main window and Settings, in Chinese and English.
+﻿# Takes README screenshots of the real app on a Windows runner: main window and Settings, in Chinese and English.
 param([string]$App = "app", [string]$Out = "shots")
 $ErrorActionPreference = "Stop"
 New-Item -ItemType Directory -Force $Out | Out-Null
