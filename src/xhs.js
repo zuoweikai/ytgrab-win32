@@ -172,32 +172,33 @@
       const x = document.querySelector('.close-circle, .note-detail-mask .close, .close-box');
       if (x) x.click();
       else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
-      await sleep(rnd(500, 900));
+      await sleep(rnd(250, 450));
     }
-    if (/\/(?:explore\/|user\/profile\/[0-9a-f]+\/)[0-9a-f]{24}/.test(location.pathname)) { history.back(); await sleep(rnd(800, 1300)); }
-    for (let i = 0; i < 10 && modalOpen(); i++) await sleep(300);
+    if (/\/(?:explore\/|user\/profile\/[0-9a-f]+\/)[0-9a-f]{24}/.test(location.pathname)) { history.back(); await sleep(rnd(400, 650)); }
+    for (let i = 0; i < 20 && modalOpen(); i++) await sleep(150);
   };
   // Open the note over the home page like a person would, and read it from the page.
   const openInPage = async (n) => {
     const a = cardFor(n.id);
     if (!a) return null;
-    a.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    await sleep(rnd(500, 1100));
+    const rc = a.getBoundingClientRect();
+    if (rc.top < 60 || rc.bottom > window.innerHeight - 20) { a.scrollIntoView({ block: 'center' }); await sleep(rnd(200, 400)); }
+    else await sleep(rnd(120, 300));
     a.click();
     let d = null;
-    for (let t = 0; t < 30 && !stopped(); t++) {       // up to ~10 s
-      await sleep(330);
-      if (t === 10 && !modalOpen() && !location.pathname.includes(n.id)) break;   // the click did not open it
+    for (let t = 0; t < 60 && !stopped(); t++) {       // up to ~9 s, checked often so it moves on as soon as the note loads
+      await sleep(150);
+      if (t === 20 && !modalOpen() && !location.pathname.includes(n.id)) break;   // the click did not open it
       const fn = feedNotes.get(n.id);
       if (fn && media(fn).length) { d = { url: location.href, note: fn }; break; }
       const pn = fromPage(n.id);
       if (pn && media(pn).length) { d = { url: location.href, note: pn }; break; }
-      if (t > 8 && modalOpen()) {
+      if (t > 16 && modalOpen()) {
         const urls = fromDom();
         if (urls.length) { d = { url: location.href, dom: urls }; break; }
       }
     }
-    await sleep(rnd(600, 1400));
+    await sleep(rnd(200, 500));
     await closeModal();
     return d;
   };
@@ -244,7 +245,7 @@
         if (!d) { d = await openInPage(n); if (d) window.scrollTo({ top: y }); }
         if (d && sendAny(n, d, owner)) { ok++; done.add(n.id); }
         else if (tr >= 2) done.add(n.id);
-        await sleep(k % 20 === 0 ? rnd(6000, 12000) : rnd(900, 2200));
+        await sleep(k % 25 === 0 ? rnd(2500, 5000) : rnd(300, 800));
       }
       if (stopped()) break;
       const bottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 50;
@@ -262,7 +263,7 @@
       status('scroll', String(notes.size), owner);
       if (Math.random() < 0.06) window.scrollBy({ top: -rnd(150, 400), behavior: 'smooth' });
       else window.scrollBy({ top: rnd(window.innerHeight * 0.6, window.innerHeight * 1.1), behavior: 'smooth' });
-      await sleep(Math.random() < 0.1 ? rnd(3000, 6000) : rnd(1000, 2400));
+      await sleep(Math.random() < 0.06 ? rnd(2000, 3500) : rnd(600, 1400));
     }
     post('done', String(ok));
   };
