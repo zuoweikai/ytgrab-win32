@@ -19,6 +19,18 @@ public static class Shot {
   [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int a, out RECT r, int s);
   delegate bool EnumProc(IntPtr h, IntPtr l);
   public struct RECT { public int L, T, R, B; }
+  public static string List(uint pid) {
+    var sb2 = new StringBuilder();
+    EnumWindows((h, l) => { uint p; GetWindowThreadProcessId(h, out p); var sb = new StringBuilder(64); GetClassName(h, sb, 64);
+      if (p == pid) sb2.AppendLine(h + " " + sb + " visible=" + IsWindowVisible(h)); return true; }, IntPtr.Zero);
+    return sb2.ToString();
+  }
+  public static IntPtr ByClass(uint pid, string cls) {
+    IntPtr found = IntPtr.Zero;
+    EnumWindows((h, l) => { uint p; GetWindowThreadProcessId(h, out p); var sb = new StringBuilder(64); GetClassName(h, sb, 64);
+      if (p == pid && sb.ToString() == cls) { found = h; return false; } return true; }, IntPtr.Zero);
+    return found;
+  }
   public static IntPtr Dialog(uint pid) {          // the app's visible dialog window (#32770)
     IntPtr found = IntPtr.Zero;
     EnumWindows((h, l) => { uint p; GetWindowThreadProcessId(h, out p); var sb = new StringBuilder(64); GetClassName(h, sb, 64);
@@ -79,8 +91,13 @@ foreach ($l in @(@{n="zh"; v=1}, @{n="en"; v=2})) {
   Seed $l.v
   $p = Start-Process $exe -PassThru
   $h = [IntPtr]::Zero
-  for ($i = 0; $i -lt 60 -and $h -eq [IntPtr]::Zero; $i++) { Start-Sleep -Milliseconds 500; $h = [Shot]::FindWindow("YtGrabMainWnd", $null) }
-  if ($h -eq [IntPtr]::Zero) { throw "main window not found" }
+  for ($i = 0; $i -lt 60 -and $h -eq [IntPtr]::Zero; $i++) { Start-Sleep -Milliseconds 500; $h = [Shot]::ByClass([uint32]$p.Id, "YtGrabMainWnd") }
+  if ($h -eq [IntPtr]::Zero) {
+    "exited=$($p.HasExited) code=$(if ($p.HasExited) { $p.ExitCode })"
+    [Shot]::List([uint32]$p.Id)
+    Get-Process | Where-Object { $_.MainWindowTitle } | Format-Table Id, ProcessName, MainWindowTitle | Out-String
+    throw "main window not found"
+  }
   Start-Sleep 4
   [Shot]::SetForegroundWindow($h) | Out-Null; Start-Sleep 1
   [Shot]::Save($h, (Join-Path $Out "main-$($l.n).png"))
