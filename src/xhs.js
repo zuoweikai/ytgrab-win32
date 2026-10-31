@@ -34,17 +34,31 @@
       if (d.has_more === false) hasMore = false;
     } catch (e) {}
   };
+  // The note the page itself loads when a note pop-up opens: keep it, in the same shape as the page state.
+  const feedNotes = new Map();
+  const camel = (v) => Array.isArray(v) ? v.map(camel) : (v && typeof v === 'object')
+    ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k.replace(/_([a-z])/g, (_, c) => c.toUpperCase()), camel(x)])) : v;
+  const fromFeed = (url, body) => {
+    if (!/\/api\/sns\/web\/v\d+\/feed/.test(url)) return;
+    try {
+      const j = typeof body === 'string' ? JSON.parse(body) : body;
+      ((j && j.data && j.data.items) || []).forEach((it) => {
+        const nc = it.note_card || it.noteCard; if (!nc) return;
+        const note = camel(nc); const id = it.id || note.noteId; if (id) feedNotes.set(id, note);
+      });
+    } catch (e) {}
+  };
   const of = window.fetch;
   window.fetch = async function (...a) {
     const r = await of.apply(this, a);
-    try { const u = (a[0] && a[0].url) || String(a[0]); if (/user_posted/.test(u)) r.clone().text().then((t) => fromApi(u, t)); } catch (e) {}
+    try { const u = (a[0] && a[0].url) || String(a[0]); if (/user_posted|\/feed/.test(u)) r.clone().text().then((t) => { fromApi(u, t); fromFeed(u, t); }); } catch (e) {}
     return r;
   };
   const xo = XMLHttpRequest.prototype.open, xs = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function (m, u) { this.__ytu = String(u); return xo.apply(this, arguments); };
   XMLHttpRequest.prototype.send = function () {
     this.addEventListener('load', () => {
-      try { if (/user_posted/.test(this.__ytu)) fromApi(this.__ytu, this.responseType === '' || this.responseType === 'text' ? this.responseText : this.response); } catch (e) {}
+      try { if (/user_posted|\/feed/.test(this.__ytu)) { const b = this.responseType === '' || this.responseType === 'text' ? this.responseText : this.response; fromApi(this.__ytu, b); fromFeed(this.__ytu, b); } } catch (e) {}
     });
     return xs.apply(this, arguments);
   };
@@ -161,6 +175,7 @@
       await sleep(rnd(500, 900));
     }
     if (/\/(?:explore\/|user\/profile\/[0-9a-f]+\/)[0-9a-f]{24}/.test(location.pathname)) { history.back(); await sleep(rnd(800, 1300)); }
+    for (let i = 0; i < 10 && modalOpen(); i++) await sleep(300);
   };
   // Open the note over the home page like a person would, and read it from the page.
   const openInPage = async (n) => {
@@ -170,8 +185,11 @@
     await sleep(rnd(500, 1100));
     a.click();
     let d = null;
-    for (let t = 0; t < 24 && !stopped(); t++) {       // up to ~8 s
+    for (let t = 0; t < 30 && !stopped(); t++) {       // up to ~10 s
       await sleep(330);
+      if (t === 10 && !modalOpen() && !location.pathname.includes(n.id)) break;   // the click did not open it
+      const fn = feedNotes.get(n.id);
+      if (fn && media(fn).length) { d = { url: location.href, note: fn }; break; }
       const pn = fromPage(n.id);
       if (pn && media(pn).length) { d = { url: location.href, note: pn }; break; }
       if (t > 8 && modalOpen()) {
@@ -202,15 +220,20 @@
     if (stopped()) return post('done', '0');
     if (waited) { await sleep(rnd(1500, 2500)); }
     const owner = nickname() || 'xiaohongshu';
-    const done = new Set();
-    let ok = 0, k = 0, fetchOk = 0, fetchBad = 0, same = 0, last = -1;
+    const done = new Set(), tries = new Map();
+    let ok = 0, k = 0, fetchOk = 0, fetchBad = 0, same = 0, last = -1, sweep = 0, lastY = -1;
+    const fetchWorks = () => fetchOk > 0 || fetchBad < 3;
     while (!stopped()) {
       harvest();
-      const todo = [...notes.values()].filter((n) => n.token && !done.has(n.id));
+      let todo = [...notes.values()].filter((n) => n.token && !done.has(n.id));
+      if (!fetchWorks()) todo = todo.filter((n) => cardFor(n.id))
+        .sort((a, b) => cardFor(a.id).getBoundingClientRect().top - cardFor(b.id).getBoundingClientRect().top);
       for (const n of todo) {
         if (stopped()) break;
-        done.add(n.id); k++;
-        status('read', String(k), String(notes.size), String(ok));
+        if (!fetchWorks() && !cardFor(n.id)) continue;   // scrolled away; comes back later
+        const tr = (tries.get(n.id) || 0) + 1; tries.set(n.id, tr);
+        if (tr === 1) k++;
+        status('read', String(Math.min(k, notes.size)), String(notes.size), String(ok));
         const y = window.scrollY;
         let d = null;
         // The quick way first; if the site keeps refusing it, open each note on the page instead.
@@ -219,13 +242,23 @@
           if (d && media(d.note).length) fetchOk++; else { d = null; fetchBad++; }
         }
         if (!d) { d = await openInPage(n); if (d) window.scrollTo({ top: y }); }
-        if (d && sendAny(n, d, owner)) ok++;
+        if (d && sendAny(n, d, owner)) { ok++; done.add(n.id); }
+        else if (tr >= 2) done.add(n.id);
         await sleep(k % 20 === 0 ? rnd(6000, 12000) : rnd(900, 2200));
       }
       if (stopped()) break;
-      if (notes.size === last) same++; else { same = 0; last = notes.size; }
       const bottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 50;
-      if ((apiSeen && !hasMore && bottom && same >= 2) || same >= 9) break;
+      // Stop only once the page stops moving and nothing new turns up (the list may know all notes long before the end).
+      const stuck = bottom || Math.abs(window.scrollY - lastY) < 5; lastY = window.scrollY;
+      if (notes.size === last && stuck) same++; else { same = 0; last = notes.size; }
+      if ((apiSeen && !hasMore && bottom && same >= 2) || same >= 9) {
+        const left = [...notes.values()].some((n) => n.token && !done.has(n.id));
+        if (!left || sweep) break;
+        sweep = 1; same = 0; last = -1;                 // one more pass from the top for what was missed
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        await sleep(rnd(2000, 3500));
+        continue;
+      }
       status('scroll', String(notes.size), owner);
       if (Math.random() < 0.06) window.scrollBy({ top: -rnd(150, 400), behavior: 'smooth' });
       else window.scrollBy({ top: rnd(window.innerHeight * 0.6, window.innerHeight * 1.1), behavior: 'smooth' });
