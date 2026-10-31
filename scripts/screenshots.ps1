@@ -65,23 +65,24 @@ Language=$lang
 OutDir=$dl
 WinX=40
 WinY=40
-WinW=1000
+WinW=1120
 WinH=600
 Cookies=builtin
 CookiesV2=1
 "@
   Set-Content -Encoding Unicode (Join-Path (Split-Path $exe) "settings.ini") $ini
   $rows = @(
-    @("D", "https://www.youtube.com/watch?v=aqz-KE-bpKQ", "Big Buck Bunny 60fps 4K - Official Blender Foundation Short Film", "Big Buck Bunny.mp4", "642000000"),
+    @("D", "https://www.youtube.com/watch?v=aqz-KE-bpKQ", "Big Buck Bunny 4K", "Big Buck Bunny.mp4", "642000000"),
     @("D", "https://www.bilibili.com/video/BV1GJ411x7h7", $(if ($zh) {"【4K】春日樱花延时摄影"} else {"[4K] Cherry blossom time-lapse"}), "sakura.mp4", "215000000"),
     @("D", "https://www.youtube.com/watch?v=WhWc3b3KhnY", "Spring - Blender Open Movie", "Spring.mp4", "388000000"),
-    @("Q", "https://www.youtube.com/watch?v=eRsGyueVLvQ", "Sintel - Open Movie by Blender Foundation", "", "1250000000"),
-    @("Q", "https://www.xiaohongshu.com/explore/000000000000000000000000", $(if ($zh) {"周末徒步 | 山顶看日出"} else {"Weekend hike: sunrise at the summit"}), "", "86000000")
+    @("Q", "https://www.youtube.com/watch?v=eRsGyueVLvQ", "Sintel - Open Movie", "", "1250000000"),
+    @("Q", "https://www.bilibili.com/video/BV1xx411c7mD", $(if ($zh) {"周末徒步 | 山顶看日出"} else {"Weekend hike: sunrise at the summit"}), "", "86000000")
   )
   $txt = "YtGrabTasks 1`n"
   foreach ($r in $rows) {
     $fp = if ($r[3]) { "$dl\$($r[3])" } else { "" }
-    $txt += ($r[0], $r[1], $dl, "0", "0", $r[2], $fp, "", $r[4], "0", "0", "", "") -join "`t"
+    $e = { param($v) $v -replace '\\', '\\' }      # tasks.txt escapes backslashes
+    $txt += ($r[0], $r[1], (& $e $dl), "0", "0", $r[2], (& $e $fp), "", $r[4], "0", "0", "", "") -join "`t"
     $txt += "`n"
   }
   [IO.File]::WriteAllText((Join-Path (Split-Path $exe) "tasks.txt"), $txt, (New-Object Text.UTF8Encoding $false))
