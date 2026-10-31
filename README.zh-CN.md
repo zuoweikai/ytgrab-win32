@@ -4,7 +4,6 @@
 
 一款基于 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 的 Windows 视频下载器，小巧快速。使用 C++ 和原生 Win32 控件编写，静态编译为单个约 350 KB 的 `YtGrab.exe`，无需安装 .NET、VC++ 运行库或 Python。发布包已内置 yt-dlp 和 ffmpeg。
 
-想要 Windows 11 风格界面？请看 WinUI 3 版：[ytgrab-winui](https://github.com/zuoweikai/ytgrab-winui)。
 
 ## 下载
 

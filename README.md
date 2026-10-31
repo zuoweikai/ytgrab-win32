@@ -4,7 +4,6 @@
 
 A tiny, fast Windows video downloader built on [yt-dlp](https://github.com/yt-dlp/yt-dlp). Written in C++ with plain Win32 controls and compiled into a single static `YtGrab.exe` of about 350 KB: no .NET, VC++ runtime, or Python to install. yt-dlp and ffmpeg come bundled in the release.
 
-Prefer a Windows 11 look? See the WinUI 3 edition: [ytgrab-winui](https://github.com/zuoweikai/ytgrab-winui).
 
 ## Download
 
