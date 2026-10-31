@@ -432,6 +432,11 @@ static void LoadSettings() {
     if (g_set.outDir.empty()) g_set.outDir = KnownFolder(FOLDERID_Downloads);
     g_set.proxy    = IniStr(L"Proxy");
     g_set.cookies  = IniStr(L"Cookies", L"builtin");
+    // Older versions saved "none" as an empty value; switch those to the built-in browser once.
+    if (IniInt(L"CookiesV2", 0) == 0) {
+        if (g_set.cookies.empty()) { g_set.cookies = L"builtin"; IniPut(L"Cookies", g_set.cookies); }
+        IniPut(L"CookiesV2", 1);
+    }
     g_set.rate     = IniStr(L"RateLimit");
     g_set.ytdlpPath= IniStr(L"YtdlpPath");
     g_set.fmt      = IniInt(L"Format", 0);
