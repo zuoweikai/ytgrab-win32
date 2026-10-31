@@ -2,6 +2,9 @@ name: screenshots
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   shots:
     runs-on: windows-latest
@@ -14,8 +17,14 @@ jobs:
           gh release download -R ${{ github.repository }} --pattern 'YtGrab-Win32-x64.zip' -O app.zip
           Expand-Archive app.zip -DestinationPath app
       - name: Screenshots
-        run: ./scripts/screenshots.ps1 -App app -Out shots
+        run: ./scripts/screenshots.ps1 -App app -Out docs/screenshots
       - uses: actions/upload-artifact@v4
         with:
           name: screenshots
-          path: shots
+          path: docs/screenshots
+      - name: Commit screenshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots
+          git diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git commit -m "Update screenshots"; git push }
