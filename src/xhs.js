@@ -145,10 +145,53 @@
     return true;
   };
 
-  // ---- the whole home page
+  // ---- the whole home page: read each note as soon as its card shows up, so downloads start right away
+  const cardFor = (id) => {
+    for (const a of document.querySelectorAll('a[href*="' + id + '"]')) {
+      if (a.offsetParent !== null && a.getBoundingClientRect().height > 20) return a;
+    }
+    return null;
+  };
+  const modalOpen = () => !!document.querySelector('.note-detail-mask, #noteContainer');
+  const closeModal = async () => {
+    for (let i = 0; i < 3 && modalOpen(); i++) {
+      const x = document.querySelector('.close-circle, .note-detail-mask .close, .close-box');
+      if (x) x.click();
+      else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+      await sleep(rnd(500, 900));
+    }
+    if (/\/(?:explore\/|user\/profile\/[0-9a-f]+\/)[0-9a-f]{24}/.test(location.pathname)) { history.back(); await sleep(rnd(800, 1300)); }
+  };
+  // Open the note over the home page like a person would, and read it from the page.
+  const openInPage = async (n) => {
+    const a = cardFor(n.id);
+    if (!a) return null;
+    a.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    await sleep(rnd(500, 1100));
+    a.click();
+    let d = null;
+    for (let t = 0; t < 24 && !stopped(); t++) {       // up to ~8 s
+      await sleep(330);
+      const pn = fromPage(n.id);
+      if (pn && media(pn).length) { d = { url: location.href, note: pn }; break; }
+      if (t > 8 && modalOpen()) {
+        const urls = fromDom();
+        if (urls.length) { d = { url: location.href, dom: urls }; break; }
+      }
+    }
+    await sleep(rnd(600, 1400));
+    await closeModal();
+    return d;
+  };
+  const sendAny = (n, d, owner) => {
+    if (d.note) return sendNote(n, d, owner);
+    post('note', n.id, n.title || n.id, owner, /video/.test(d.dom[0]) ? 'video' : 'image', d.url, d.dom.join(L));
+    return true;
+  };
+
   const crawlProfile = async () => {
     status('open');
-    await sleep(rnd(2500, 4000));
+    await sleep(rnd(2000, 3000));
     let waited = 0;
     while (!loggedIn() && !stopped()) {
       if (waited % 10 === 0) post('login', '');
@@ -157,31 +200,36 @@
       if (waited > 400) { post('done', '0'); return; }
     }
     if (stopped()) return post('done', '0');
-    if (waited) { await sleep(rnd(2000, 3500)); }
-    harvest();
-    const owner = nickname();
-    let same = 0, last = -1;
-    for (let i = 0; !stopped(); i++) {
+    if (waited) { await sleep(rnd(1500, 2500)); }
+    const owner = nickname() || 'xiaohongshu';
+    const done = new Set();
+    let ok = 0, k = 0, fetchOk = 0, fetchBad = 0, same = 0, last = -1;
+    while (!stopped()) {
       harvest();
-      status('scroll', String(notes.size), owner);
+      const todo = [...notes.values()].filter((n) => n.token && !done.has(n.id));
+      for (const n of todo) {
+        if (stopped()) break;
+        done.add(n.id); k++;
+        status('read', String(k), String(notes.size), String(ok));
+        const y = window.scrollY;
+        let d = null;
+        // The quick way first; if the site keeps refusing it, open each note on the page instead.
+        if (fetchOk > 0 || fetchBad < 3) {
+          d = await detail(n);
+          if (d && media(d.note).length) fetchOk++; else { d = null; fetchBad++; }
+        }
+        if (!d) { d = await openInPage(n); if (d) window.scrollTo({ top: y }); }
+        if (d && sendAny(n, d, owner)) ok++;
+        await sleep(k % 20 === 0 ? rnd(6000, 12000) : rnd(900, 2200));
+      }
+      if (stopped()) break;
       if (notes.size === last) same++; else { same = 0; last = notes.size; }
       const bottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 50;
       if ((apiSeen && !hasMore && bottom && same >= 2) || same >= 9) break;
-      // human-like: uneven steps, now and then a longer look or a small step back
-      if (Math.random() < 0.08) window.scrollBy({ top: -rnd(150, 400), behavior: 'smooth' });
-      else window.scrollBy({ top: rnd(window.innerHeight * 0.5, window.innerHeight * 1.1), behavior: 'smooth' });
-      await sleep(Math.random() < 0.12 ? rnd(4000, 8000) : rnd(1200, 3200));
-    }
-    const list = [...notes.values()].filter((n) => n.token);
-    post('list', String(list.length), owner);
-    let ok = 0, k = 0;
-    for (const n of list) {
-      if (stopped()) break;
-      k++;
-      status('read', String(k), String(list.length), String(ok));
-      const d = await detail(n);
-      if (d && sendNote(n, d, owner || 'xiaohongshu')) ok++;
-      await sleep(k % 15 === 0 ? rnd(10000, 20000) : rnd(1800, 4500));
+      status('scroll', String(notes.size), owner);
+      if (Math.random() < 0.06) window.scrollBy({ top: -rnd(150, 400), behavior: 'smooth' });
+      else window.scrollBy({ top: rnd(window.innerHeight * 0.6, window.innerHeight * 1.1), behavior: 'smooth' });
+      await sleep(Math.random() < 0.1 ? rnd(3000, 6000) : rnd(1000, 2400));
     }
     post('done', String(ok));
   };
