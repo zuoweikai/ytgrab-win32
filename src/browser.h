@@ -116,6 +116,26 @@ static std::wstring CookieArgs(std::wstring* tmpOut) {
 }
 
 // ---- Xiaohongshu media tasks (direct download, no yt-dlp)
+// Starts the page script, telling it which notes are already in the list so it skips them.
+static void BGo() {
+    if (!g_wv) return;
+    std::wstring js = L"window.__ytgrabSkip=[";
+    {
+        std::lock_guard<std::mutex> lk(g_mx);
+        bool first = true;
+        for (auto& x : g_tasks) {
+            if (x->mediaId.empty() || x->st == TS_FAILED || x->st == TS_CANCELED) continue;
+            bool hex = x->mediaId.size() == 24;
+            for (wchar_t c : x->mediaId) if (!iswxdigit(c)) hex = false;
+            if (!hex) continue;
+            if (!first) js += L",";
+            js += L"'" + x->mediaId + L"'"; first = false;
+        }
+    }
+    js += L"];window.__ytgrabGo&&window.__ytgrabGo()";
+    g_wv->ExecuteScript(js.c_str(), nullptr);
+}
+
 static void AddMediaTask(const std::wstring& id, const std::wstring& title, const std::wstring& owner,
                          const std::wstring& page, const std::vector<std::wstring>& urls) {
     ReadUiSettings();
@@ -301,6 +321,7 @@ static void CrawlFollow(const std::wstring& u, bool loaded) {
     std::wstring l = Lower(u);
     if (!Has(l, L"xiaohongshu.com")) return;
     if (Has(l, L"xiaohongshu.com/login") || Has(l, L"/website-login")) {
+        if (g_crawling) g_crawlPending = true;   // signed out mid-crawl: after sign-in, reopen the page and resume
         if (!g_crawlLogin) {
             g_crawlLogin = true;
             BStatus(T(L"请先在这个窗口登录小红书，登录后会自动继续"));
@@ -314,7 +335,7 @@ static void CrawlFollow(const std::wstring& u, bool loaded) {
         if (Has(l, L"/discovery/item/") || (Has(l, L"/explore/") && Has(l, L"xsec_token"))) g_crawlNoteUrl = u;
         if (loaded && g_crawlPending) {
             g_crawlPending = false; g_crawlLogin = false;
-            g_wv->ExecuteScript(L"window.__ytgrabGo&&window.__ytgrabGo()", nullptr);
+            BGo();
         }
         return;
     }
@@ -346,7 +367,7 @@ static void StartCrawlHere() {
     if (!g_wv) return;
     g_crawling = true; g_crawlPending = false; g_crawlAdded = 0;
     BCrawlButton();
-    g_wv->ExecuteScript(L"window.__ytgrabGo&&window.__ytgrabGo()", nullptr);
+    BGo();
 }
 
 static std::vector<std::wstring> Split(const std::wstring& s, wchar_t sep) {
@@ -366,6 +387,8 @@ static void OnPageMessage(const std::wstring& msg) {
         if (c == L"open") BStatus(T(L"正在打开主页…"));
         else if (c == L"login") BStatus(T(L"请先在这个窗口登录小红书，登录后会自动继续"));
         else if (c == L"verify") BStatus(T(L"小红书要求验证，暂停 60 秒后重试…"));
+        else if (c == L"rest") BStatus(T(L"防止被小红书限流，休息 ") + at(2) + T(L" 秒后继续…"));
+        else if (c == L"cool") BStatus(T(L"小红书可能在限流，暂停 ") + at(2) + T(L" 秒，之后放慢速度…"));
         else if (c == L"scroll") BStatus(T(L"正在浏览主页，已找到 ") + at(2) + T(L" 条笔记") + (at(3).empty() ? L"" : L" · " + at(3)));
         else if (c == L"read") BStatus(T(L"正在读取笔记 ") + at(2) + L" / " + at(3) + T(L"，已加入下载 ") + at(4));
         else if (c == L"notpage") BStatus(T(L"这个页面不是小红书主页或笔记"));

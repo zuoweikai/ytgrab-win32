@@ -221,9 +221,26 @@
     if (stopped()) return post('done', '0');
     if (waited) { await sleep(rnd(1500, 2500)); }
     const owner = nickname() || 'xiaohongshu';
-    const done = new Set(), tries = new Map();
-    let ok = 0, k = 0, fetchOk = 0, fetchBad = 0, same = 0, last = -1, sweep = 0, lastY = -1;
-    const fetchWorks = () => fetchOk > 0 || fetchBad < 3;
+    // Notes already in YtGrab's list are not opened again, so a crawl that was cut off resumes where it stopped.
+    const done = new Set(window.__ytgrabSkip || []), tries = new Map();
+    let ok = 0, k = 0, same = 0, last = -1, sweep = 0, lastY = -1;
+    // Only open notes on the page the way a person does; fetching note pages in the background trips Xiaohongshu's limits.
+    const fetchOk = 0, fetchBad = 3;
+    const fetchWorks = () => false;
+    // Pacing: short gaps, a break every 15-25 notes and a long one every ~120. Signs of throttling slow everything down.
+    let slow = 1, miss = 0, sinceRest = 0, restAt = Math.round(rnd(15, 25)), sinceLong = 0;
+    const rest = async (a, b, kind) => {
+      let left = Math.round(rnd(a, b) / 1000);
+      while (left > 0 && !stopped()) { status(kind, String(left)); await sleep(1000); left--; }
+    };
+    const waitLogin = async () => {
+      let w = 0;
+      while (!loggedIn() && !stopped()) {
+        if (w % 10 === 0) post('login', '');
+        status('login'); await sleep(3000); w++;
+      }
+      if (w) await rest(20000, 40000, 'rest');
+    };
     while (!stopped()) {
       harvest();
       let todo = [...notes.values()].filter((n) => n.token && !done.has(n.id));
@@ -235,17 +252,20 @@
         const tr = (tries.get(n.id) || 0) + 1; tries.set(n.id, tr);
         if (tr === 1) k++;
         status('read', String(Math.min(k, notes.size)), String(notes.size), String(ok));
+        if (!loggedIn()) { await waitLogin(); if (stopped()) break; }
         const y = window.scrollY;
-        let d = null;
-        // The quick way first; if the site keeps refusing it, open each note on the page instead.
-        if (fetchOk > 0 || fetchBad < 3) {
-          d = await detail(n);
-          if (d && media(d.note).length) fetchOk++; else { d = null; fetchBad++; }
+        let d = await openInPage(n);
+        if (d) window.scrollTo({ top: y });
+        if (d && sendAny(n, d, owner)) { ok++; done.add(n.id); miss = 0; }
+        else {
+          if (tr >= 2) done.add(n.id);
+          // Several notes in a row that will not load: Xiaohongshu is probably throttling. Cool down and slow down.
+          if (++miss >= 3) { miss = 0; slow = Math.min(slow * 1.6, 4); await rest(60000 * slow, 90000 * slow, 'cool'); }
         }
-        if (!d) { d = await openInPage(n); if (d) window.scrollTo({ top: y }); }
-        if (d && sendAny(n, d, owner)) { ok++; done.add(n.id); }
-        else if (tr >= 2) done.add(n.id);
-        await sleep(k % 25 === 0 ? rnd(2500, 5000) : rnd(300, 800));
+        if (stopped()) break;
+        if (++sinceLong >= 120) { sinceLong = 0; sinceRest = 0; await rest(90000, 150000, 'rest'); }
+        else if (++sinceRest >= restAt) { sinceRest = 0; restAt = Math.round(rnd(15, 25)); await rest(15000 * slow, 30000 * slow, 'rest'); }
+        else await sleep(rnd(1000, 2500) * slow);
       }
       if (stopped()) break;
       const bottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 50;
