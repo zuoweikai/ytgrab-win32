@@ -410,7 +410,7 @@ struct Settings {
 };
 static Settings g_set;
 // Column widths the user dragged, in 96-dpi pixels. Once set, the name column stops filling the window.
-static int g_colW[7] = {};
+static int g_colW[8] = {};
 static bool g_colsUser = false;
 static std::wstring g_ini;
 
@@ -457,12 +457,13 @@ static void LoadSettings() {
     g_set.lang = std::max(0, std::min(2, IniInt(L"Language", 0)));
     {
         std::wstring cw = IniStr(L"ColWidths"); int n = 0; size_t a = 0;
-        while (n < 7 && a < cw.size()) {
+        while (n < 8 && a < cw.size()) {
             size_t b = cw.find(L',', a); if (b == std::wstring::npos) b = cw.size();
             g_colW[n++] = std::max(30, std::min(3000, _wtoi(cw.substr(a, b - a).c_str())));
             a = b + 1;
         }
-        g_colsUser = n == 7;
+        if (n == 7) g_colW[n++] = 44;   // widths saved before the # column existed
+        g_colsUser = n == 8;
     }
     g_en = g_set.lang == 2 || (g_set.lang == 0 && PRIMARYLANGID(GetUserDefaultUILanguage()) != LANG_CHINESE);
 }
@@ -556,9 +557,10 @@ static std::wstring g_statusMsg;
 static bool g_compBusy = false;
 static int g_lastActive = 0;
 
-static const int kColW[] = { 320, 78, 170, 86, 92, 72, 300 };
-static const wchar_t* kColName[] = { L"名称", L"状态", L"进度", L"大小", L"速度", L"剩余", L"信息" };
-static const int kCols = 7;
+// Column 7 (#, the row number) is shown first; it is the last sub-item so it can be right-aligned.
+static const int kColW[] = { 320, 78, 170, 86, 92, 72, 300, 44 };
+static const wchar_t* kColName[] = { L"名称", L"状态", L"进度", L"大小", L"速度", L"剩余", L"信息", L"#" };
+static const int kCols = 8;
 
 static int S(int v) { return MulDiv(v, (int)g_dpi, 96); }
 static int ColW(int i) { return S(g_colsUser && g_colW[i] > 0 ? g_colW[i] : kColW[i]); }
@@ -1843,6 +1845,7 @@ static void OnGetDispInfo(NMLVDISPINFOW* di) {
         case 3: s = FmtBytes(t.total); break;
         case 4: if (t.st == TS_DOWNLOADING && t.speed > 0) s = FmtBytes(t.speed) + L"/s"; break;
         case 5: if (t.st == TS_DOWNLOADING) s = FmtEta(t.eta); break;
+        case 7: s = std::to_wstring(it.iItem + 1); break;
         case 6:
             if (t.st == TS_DOWNLOADING && t.nParts == 2)
                 s = ((t.part == 0) != t.part0Audio) ? T(L"正在下载视频") : T(L"正在下载音频");
@@ -2339,10 +2342,11 @@ static void OnCreate(HWND hwnd) {
     ListView_SetExtendedListViewStyle(g_hList, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP | LVS_EX_HEADERDRAGDROP);
     for (int i = 0; i < kCols; ++i) {
         LVCOLUMNW c{}; c.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT;
-        c.fmt = (i >= 3 && i <= 5) ? LVCFMT_RIGHT : LVCFMT_LEFT;
+        c.fmt = ((i >= 3 && i <= 5) || i == 7) ? LVCFMT_RIGHT : LVCFMT_LEFT;
         c.cx = ColW(i); c.pszText = (LPWSTR)T(kColName[i]);
         ListView_InsertColumn(g_hList, i, &c);
     }
+    { int order[kCols] = { 7, 0, 1, 2, 3, 4, 5, 6 }; ListView_SetColumnOrderArray(g_hList, kCols, order); }
     UpdateRowHeight();
     g_progTheme = OpenThemeData(g_hList, L"PROGRESS");
 

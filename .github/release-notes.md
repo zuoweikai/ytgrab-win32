@@ -1,11 +1,16 @@
 ## What's new / 更新内容
 
+- **Row numbers.** The task list has a new **#** column first, so you can see how many tasks there are and where each sits in the queue.
+  **序号列。** 任务列表最前面新增「#」列，一眼看出共有多少任务、每个任务排在第几。
+- **Xiaohongshu no longer signs you out mid-crawl.** Home pages are read only by opening notes on the page like a person, with a short break every 15–25 notes and a longer one every ~120. If several notes in a row fail to load, YtGrab pauses and slows down. If you do get signed out, sign in again in the built-in browser and the crawl resumes; notes already in the list are skipped. About 4–5 s per note on average.
+  **小红书抓取不再中途被登出。** 改为只在页面上像人一样逐条打开笔记，每 15–25 条短暂休息，约每 120 条长休息一次；连续几条读不到会自动暂停并放慢。万一被登出，在内置浏览器重新登录后会自动续抓，已在列表中的笔记直接跳过。平均每条约 4–5 秒。
+
+### Earlier / 之前
+
 - **Playlists are saved under the creator's folder.** A channel's Playlists page (e.g. `youtube.com/@name/playlists`) or a single playlist now saves to `<save folder>\<creator>\<playlist>\`.
   **播放列表按博主归档。** 频道的播放列表页（如 `youtube.com/@name/playlists`）或单个播放列表，现在保存到「保存文件夹\博主名\播放列表名\」。
 - **Xiaohongshu home pages about 3x faster.** Shorter pauses between notes; each note is read the moment it loads.
   **小红书主页解析提速约 3 倍。** 缩短笔记之间的停顿，笔记一加载完就立即读取。
-
-### Earlier / 之前
 
 - **Xiaohongshu home pages add every note.** The profile list only keeps cards near the screen, so earlier versions skipped most notes (e.g. "read 52, added 2"). YtGrab now opens notes as their cards come into view, reads each note from the page's own data, retries misses, and does a final pass from the top. It also keeps scrolling to the real end even when the note count is already known.
   **小红书主页笔记不再漏加。** 主页列表只保留屏幕附近的卡片，旧版会跳过大部分笔记（如「读取 52 条，只加入 2 条」）。现在随滚动打开出现在屏幕上的笔记，直接读取页面自己加载的数据，失败会重试，最后再从顶部补扫一遍；即使已知笔记总数，也会一直滚到真正的底部。
